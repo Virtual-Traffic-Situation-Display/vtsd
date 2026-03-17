@@ -4,6 +4,7 @@
         xmlns:views="using:vTFMS.Views"
         x:Class="vTFMS.MainWindow"
         x:DataType="vm:MainViewModel"
+        Icon="avares://vTFMS/Assets/vtfms-logo.png"
         Title="Virtual Traffic Situation Display"
         Background="Black"
         Width="1200" Height="800"
