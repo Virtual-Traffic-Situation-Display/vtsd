@@ -52,10 +52,6 @@ public partial class MainViewModel : ObservableObject
         {
             if (e.PropertyName == nameof(TsdViewModel.VatsimConnected))
                 OnPropertyChanged(nameof(VatsimConnected));
-        }; TsdViewModel.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(TsdViewModel.VatsimConnected))
-                OnPropertyChanged(nameof(VatsimConnected));
         };
     }
 
