@@ -51,4 +51,4 @@ dotnet run --project vTFMS
 
 ## License
 
-TBD
+This project is licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). You are free to fork and modify, but you must credit the original authors, keep derivatives under the same license, and may not use it commercially.
