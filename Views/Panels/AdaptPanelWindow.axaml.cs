@@ -30,7 +30,7 @@ public partial class AdaptPanelWindow : BasePanelWindow
         {
             ("Background",          nameof(_vm.BackgroundColor),
                 false, "", ""),
-            ("State/Country",       nameof(_vm.StateBoundaryColor),
+            ("State/Country",       nameof(_vm.BoundaryColor),
                 false, "", ""),
             ("TRACON",              nameof(_vm.TraconColor),
                 false, "", ""),
@@ -199,10 +199,8 @@ public partial class AdaptPanelWindow : BasePanelWindow
                 {
                     case nameof(_vm.BackgroundColor):
                         _vm.BackgroundColor = hex; break;
-                    case nameof(_vm.StateBoundaryColor):
-                        _vm.StateBoundaryColor = hex; break;
-                    case nameof(_vm.CountryBoundaryColor):
-                        _vm.CountryBoundaryColor = hex; break;
+                    case nameof(_vm.BoundaryColor):
+                        _vm.BoundaryColor = hex; break;
                     case nameof(_vm.TraconColor):
                         _vm.TraconColor = hex; break;
                     case nameof(_vm.ArtccColor):

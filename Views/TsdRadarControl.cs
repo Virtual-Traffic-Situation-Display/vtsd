@@ -710,7 +710,7 @@ public class TsdRadarControl : Control
             context.DrawGeometry(null,
                 new Pen(new SolidColorBrush(
                     Avalonia.Media.Color.Parse(
-                        DisplaySettings.StateBoundaryColor)), 0.8),
+                        DisplaySettings.BoundaryColor)), 0.8),
                 _stateBoundaryGeometry);
 
         // Country boundaries
@@ -718,7 +718,7 @@ public class TsdRadarControl : Control
             context.DrawGeometry(null,
                 new Pen(new SolidColorBrush(
                     Avalonia.Media.Color.Parse(
-                        DisplaySettings.StateBoundaryColor)), 0.8),
+                        DisplaySettings.BoundaryColor)), 0.8),
                 _countryBoundaryGeometry);
 
         // Sector boundaries

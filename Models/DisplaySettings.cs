@@ -3,8 +3,7 @@
 public class DisplaySettings
 {
     public string BackgroundColor { get; set; } = "#000000";
-    public string StateBoundaryColor { get; set; } = "#AAFF00";
-    public string CountryBoundaryColor { get; set; } = "#AAFF00";
+    public string BoundaryColor { get; set; } = "#AAFF00";
     public string TraconColor { get; set; } = "#00CCFF";
     public string ArtccColor { get; set; } = "#CC0000";
     public string AirportColor { get; set; } = "#00CCFF";
@@ -23,8 +22,7 @@ public class DisplaySettings
     public DisplaySettings Clone() => new()
     {
         BackgroundColor = BackgroundColor,
-        StateBoundaryColor = StateBoundaryColor,
-        CountryBoundaryColor = CountryBoundaryColor,
+        BoundaryColor = BoundaryColor,
         TraconColor = TraconColor,
         ArtccColor = ArtccColor,
         AirportColor = AirportColor,
