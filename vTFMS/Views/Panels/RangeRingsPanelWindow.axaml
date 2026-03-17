@@ -1,7 +1,0 @@
-<panels:BasePanelWindow
-    xmlns="https://github.com/avaloniaui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:panels="using:vTFMS.Views.Panels"
-    x:Class="vTFMS.Views.Panels.RangeRingsPanelWindow"
-    Width="320" Height="240">
-</panels:BasePanelWindow>
