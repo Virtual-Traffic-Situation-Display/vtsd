@@ -12,8 +12,7 @@ public partial class AdaptPanelViewModel : BasePanelViewModel
     private DisplaySettings _original = new();
 
     [ObservableProperty] private string _backgroundColor;
-    [ObservableProperty] private string _stateBoundaryColor;
-    [ObservableProperty] private string _countryBoundaryColor;
+    [ObservableProperty] private string _boundaryColor;
     [ObservableProperty] private string _traconColor;
     [ObservableProperty] private string _artccColor;
     [ObservableProperty] private string _airportColor;
@@ -41,8 +40,7 @@ public partial class AdaptPanelViewModel : BasePanelViewModel
     private void LoadFromSettings(DisplaySettings s)
     {
         BackgroundColor = s.BackgroundColor;
-        StateBoundaryColor = s.StateBoundaryColor;
-        CountryBoundaryColor = s.CountryBoundaryColor;
+        BoundaryColor = s.BoundaryColor;
         TraconColor = s.TraconColor;
         ArtccColor = s.ArtccColor;
         AirportColor = s.AirportColor;
@@ -62,8 +60,7 @@ public partial class AdaptPanelViewModel : BasePanelViewModel
     private DisplaySettings ToSettings() => new()
     {
         BackgroundColor = BackgroundColor,
-        StateBoundaryColor = StateBoundaryColor,
-        CountryBoundaryColor = CountryBoundaryColor,
+        BoundaryColor = BoundaryColor,
         TraconColor = TraconColor,
         ArtccColor = ArtccColor,
         AirportColor = AirportColor,
