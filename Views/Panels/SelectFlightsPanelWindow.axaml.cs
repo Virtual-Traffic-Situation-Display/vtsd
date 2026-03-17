@@ -194,21 +194,6 @@ public partial class SelectFlightsPanelWindow : BasePanelWindow
         };
 
         Grid.SetColumn(colorRect, 2);
-        colorRect.PointerPressed += async (_, _) =>
-        {
-            // Color picker placeholder — will expand in settings update
-            var colors = new[]
-            {
-                "#0000FF", "#FF8C00", "#FF0000",
-                "#FFB6C1", "#808080", "#90EE90",
-                "#FFFF00", "#00CCFF", "#FFFFFF"
-            };
-            var current = Array.IndexOf(colors, filter.Color);
-            filter.Color = colors[(current + 1) % colors.Length];
-            colorRect.Background = new SolidColorBrush(
-                Color.Parse(filter.Color));
-        };
-        Grid.SetColumn(colorRect, 2);
 
         // Arrival text box
         var arrivalBox = new TextBox
