@@ -1,0 +1,9 @@
+<panels:BasePanelWindow
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:panels="using:vTFMS.Views.Panels"
+    xmlns:vm="using:vTFMS.ViewModels.Panels"
+    x:Class="vTFMS.Views.Panels.ShowMapItemPanelWindow"
+    x:DataType="vm:ShowMapItemPanelViewModel"
+    Width="520" Height="320">
+</panels:BasePanelWindow>
