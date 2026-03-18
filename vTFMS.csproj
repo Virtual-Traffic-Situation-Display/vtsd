@@ -5,34 +5,27 @@
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-	<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
-	<AvaloniaResource Include="Assets\**" />
+	  <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
 
   <ItemGroup>
-	<None Remove="Data\APT_BASE.csv" />
-	<None Remove="Data\FIX_BASE.csv" />
-	<None Remove="Data\na-countries.json" />
-	<None Remove="Data\na-provinces.json" />
-	<None Remove="Data\NAV_BASE.csv" />
-	<None Remove="Data\tracon-boundaries.json" />
+	  <None Remove="Data\APT_BASE.csv" />
+	  <None Remove="Data\FIX_BASE.csv" />
+	  <None Remove="Data\na-countries.json" />
+	  <None Remove="Data\na-provinces.json" />
+	  <None Remove="Data\NAV_BASE.csv" />
+	  <None Remove="Data\tracon-boundaries.json" />
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Data\APT_BASE.csv">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Data\FIX_BASE.csv">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
+    <EmbeddedResource Include="Data\APT_BASE.csv" />
+    <EmbeddedResource Include="Data\FIX_BASE.csv" />
     <EmbeddedResource Include="Data\na-countries.json" />
     <EmbeddedResource Include="Data\na-provinces.json" />
-    <EmbeddedResource Include="Data\NAV_BASE.csv">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </EmbeddedResource>
+    <EmbeddedResource Include="Data\NAV_BASE.csv" />
     <EmbeddedResource Include="Data\tracon-boundaries.json" />
   </ItemGroup>
 
