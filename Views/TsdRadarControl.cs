@@ -340,17 +340,20 @@ public class TsdRadarControl : Control
                 try
                 {
                     using var ms = new System.IO.MemoryStream(data);
+                    _radarBitmap?.Dispose();
                     _radarBitmap = new Avalonia.Media.Imaging.Bitmap(ms);
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine(
                         $"TsdRadarControl: bitmap error — {ex.Message}");
+                    _radarBitmap?.Dispose();
                     _radarBitmap = null;
                 }
             }
             else
             {
+                _radarBitmap?.Dispose();
                 _radarBitmap = null;
             }
             InvalidateVisual();
