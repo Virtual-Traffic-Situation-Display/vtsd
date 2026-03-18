@@ -3,7 +3,132 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:panels="using:vTFMS.Views.Panels"
     xmlns:vm="using:vTFMS.ViewModels.Panels"
+    xmlns:models="using:vTFMS.Models"
     x:Class="vTFMS.Views.Panels.SelectFlightsPanelWindow"
     x:DataType="vm:SelectFlightsPanelViewModel"
     Width="700" Height="400">
+
+  <Grid RowDefinitions="Auto,*,Auto" Margin="4">
+
+    <!-- Column headers -->
+    <Grid Grid.Row="0"
+          ColumnDefinitions="30,50,60,80,80,70,60,70,70"
+          Margin="4,4,4,0">
+      <TextBlock Grid.Column="0" Text=""
+                 FontFamily="Arial" FontSize="11" FontWeight="Bold"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      <TextBlock Grid.Column="1" Text="Show"
+                 FontFamily="Arial" FontSize="11" FontWeight="Bold"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      <TextBlock Grid.Column="2" Text="Color"
+                 FontFamily="Arial" FontSize="11" FontWeight="Bold"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      <TextBlock Grid.Column="3" Text="Arrival"
+                 FontFamily="Arial" FontSize="11" FontWeight="Bold"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      <TextBlock Grid.Column="4" Text="Departure"
+                 FontFamily="Arial" FontSize="11" FontWeight="Bold"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      <TextBlock Grid.Column="5" Text="Data Block"
+                 FontFamily="Arial" FontSize="11" FontWeight="Bold"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      <TextBlock Grid.Column="6" Text="Show Route"
+                 FontFamily="Arial" FontSize="11" FontWeight="Bold"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      <TextBlock Grid.Column="7" Text="Draw Route"
+                 FontFamily="Arial" FontSize="11" FontWeight="Bold"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      <TextBlock Grid.Column="8" Text="Filter"
+                 FontFamily="Arial" FontSize="11" FontWeight="Bold"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    </Grid>
+
+    <!-- Scrollable filter rows -->
+    <ScrollViewer Grid.Row="1">
+      <ItemsControl ItemsSource="{Binding Filters}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="models:FlightFilter">
+            <Grid ColumnDefinitions="30,50,60,80,80,70,60,70,70"
+                  Margin="4,2,4,2">
+
+              <TextBlock Grid.Column="0"
+                         Text="{Binding RowNumber}"
+                         FontFamily="Arial" FontSize="11"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center"/>
+
+              <CheckBox Grid.Column="1"
+                        IsChecked="{Binding Show}"
+                        HorizontalAlignment="Center"/>
+
+              <Border Grid.Column="2"
+                      Width="40" Height="20"
+                      CornerRadius="2"
+                      HorizontalAlignment="Center"
+                      Background="{Binding Color,
+                        Converter={StaticResource HexToBrushConverter}}"
+                      Cursor="Hand"
+                      BorderThickness="1"
+                      BorderBrush="#545454"
+                      PointerPressed="ColorSwatch_PointerPressed"/>
+
+              <TextBox Grid.Column="3"
+                       Text="{Binding Arrival}"
+                       FontFamily="Arial" FontSize="11"
+                       Width="60"
+                       HorizontalAlignment="Center"/>
+
+              <TextBox Grid.Column="4"
+                       Text="{Binding Departure}"
+                       FontFamily="Arial" FontSize="11"
+                       Width="60"
+                       HorizontalAlignment="Center"/>
+
+              <CheckBox Grid.Column="5"
+                        IsChecked="{Binding DataBlock}"
+                        HorizontalAlignment="Center"/>
+
+              <CheckBox Grid.Column="6"
+                        IsChecked="{Binding ShowRoute}"
+                        HorizontalAlignment="Center"/>
+
+              <CheckBox Grid.Column="7"
+                        IsChecked="{Binding DrawRoute}"
+                        HorizontalAlignment="Center"/>
+
+              <CheckBox Grid.Column="8"
+                        IsChecked="{Binding Filter}"
+                        HorizontalAlignment="Center"/>
+
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+    <!-- Bottom buttons -->
+    <StackPanel Grid.Row="2"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Margin="4">
+      <Button Content="+ Add Row"
+              Command="{Binding AddRowCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4"/>
+      <Button Content="OK"
+              Command="{Binding OkCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4"/>
+      <Button Content="Apply"
+              Command="{Binding ApplyCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4"/>
+      <Button Content="Cancel"
+              Command="{Binding CancelCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4"/>
+    </StackPanel>
+
+  </Grid>
+
 </panels:BasePanelWindow>

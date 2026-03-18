@@ -2,6 +2,49 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:panels="using:vTFMS.Views.Panels"
+    xmlns:vm="using:vTFMS.ViewModels.Panels"
     x:Class="vTFMS.Views.Panels.SelectWeatherPanelWindow"
-    Width="280" Height="160">
+    x:DataType="vm:SelectWeatherPanelViewModel"
+    Width="280" Height="200">
+
+  <StackPanel Margin="4">
+
+    <CheckBox Content="Show MRMS Radar"
+              IsChecked="{Binding ShowWeather}"
+              FontFamily="Arial" FontSize="12"
+              Margin="8"/>
+
+    <Button Content="Refresh Now"
+            Command="{Binding FetchWeatherCommand}"
+            FontFamily="Arial" FontSize="12"
+            Margin="8"
+            HorizontalAlignment="Stretch"/>
+
+    <TextBlock Text="{Binding StatusMessage}"
+               FontFamily="Arial" FontSize="11"
+               Margin="8,0,8,8"/>
+
+    <StackPanel Orientation="Horizontal"
+                Margin="0,4,0,0">
+
+      <TextBlock Text="Opacity:"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center"
+                 Margin="8,0,4,0"/>
+
+      <Slider Minimum="0.1" Maximum="1.0"
+              Value="{Binding RadarOpacity}"
+              Width="120"
+              VerticalAlignment="Center"
+              Margin="0,0,4,0"/>
+
+      <TextBlock Text="{Binding RadarOpacity, StringFormat={}{0:P0}}"
+                 FontFamily="Arial" FontSize="11"
+                 Width="35"
+                 VerticalAlignment="Center"/>
+
+    </StackPanel>
+
+  </StackPanel>
+
 </panels:BasePanelWindow>
