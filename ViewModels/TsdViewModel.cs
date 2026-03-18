@@ -10,7 +10,7 @@ using vTFMS.ViewModels.Panels;
 
 namespace vTFMS.ViewModels;
 
-public partial class TsdViewModel : ObservableObject
+public partial class TsdViewModel : ObservableObject, IDisposable
 {
     private readonly IMapDataService _mapDataService;
     private readonly IVatsimService _vatsimService;
@@ -412,5 +412,13 @@ public partial class TsdViewModel : ObservableObject
             CenterLat + latRange,
             CenterLon + lonRange
         );
+    }
+
+    public void Dispose()
+    {
+        _vatsimService.PilotsUpdated -= OnPilotsUpdated;
+        _weatherService.AutoRefreshTriggered -= OnAutoRefreshTriggered;
+        _vatsimService.Stop();
+        _weatherService.Stop();
     }
 }
