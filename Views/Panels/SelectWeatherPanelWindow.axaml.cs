@@ -4,11 +4,18 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using vTFMS.ViewModels;
 using vTFMS.ViewModels.Panels;
+using System;
 
 namespace vTFMS.Views.Panels;
 
 public partial class SelectWeatherPanelWindow : BasePanelWindow
 {
+    public SelectWeatherPanelWindow()
+    {
+        throw new InvalidOperationException(
+            "Use the constructor that takes a TsdViewModel.");
+    }
+
     private readonly TsdViewModel _tsdViewModel;
 
     public SelectWeatherPanelWindow(TsdViewModel tsdViewModel)

@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using vTFMS.Models;
 using vTFMS.Services;
 using vTFMS.ViewModels;
@@ -108,16 +109,16 @@ public partial class MainViewModel : ObservableObject
     // ── Filters commands ──────────────────────────────────────
 
     [RelayCommand]
-    private void SaveFilters()
+    private async Task SaveFilters()
     {
         if (_profileService.LastFiltersPath != null)
             DoSaveFilters(_profileService.LastFiltersPath);
         else
-            SaveFiltersAs();
+            await SaveFiltersAs();
     }
 
     [RelayCommand]
-    private async void SaveFiltersAs()
+    private async Task SaveFiltersAs()
     {
         var file = await _mainWindow.StorageProvider.SaveFilePickerAsync(
             new FilePickerSaveOptions
@@ -158,7 +159,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async void LoadFilters()
+    private async Task LoadFilters()
     {
         var files = await _mainWindow.StorageProvider.OpenFilePickerAsync(
             new FilePickerOpenOptions

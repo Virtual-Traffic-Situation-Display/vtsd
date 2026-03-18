@@ -11,6 +11,12 @@ namespace vTFMS.Views.Panels;
 
 public partial class AdaptPanelWindow : BasePanelWindow
 {
+    public AdaptPanelWindow()
+    {
+        throw new InvalidOperationException(
+            "Use the constructor that takes a TsdViewModel.");
+    }
+
     private AdaptPanelViewModel _vm;
 
     public AdaptPanelWindow(TsdViewModel tsdViewModel)
