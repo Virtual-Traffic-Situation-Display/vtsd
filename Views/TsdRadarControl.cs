@@ -511,13 +511,13 @@ public class TsdRadarControl : Control
 
                 foreach (var point in artcc.Points)
                 {
-                    // NaN sentinel = end of ring, start new figure
+                    if (point is null) continue;
                     if (double.IsNaN(point.Lat) || double.IsNaN(point.Lon))
                     {
                         if (figure != null)
                         {
                             figure.IsClosed = true;
-                            path.Figures.Add(figure);
+                            path.Figures!.Add(figure);
                             figure = null;
                         }
                         continue;
@@ -536,16 +536,15 @@ public class TsdRadarControl : Control
                     }
                     else
                     {
-                        figure.Segments.Add(
+                        figure.Segments!.Add(
                             new LineSegment { Point = screenPt });
                     }
                 }
 
-                // Close any remaining open figure
                 if (figure != null)
                 {
                     figure.IsClosed = true;
-                    path.Figures.Add(figure);
+                    path.Figures!.Add(figure);
                 }
 
                 geo.Children.Add(path);
@@ -674,18 +673,28 @@ public class TsdRadarControl : Control
 
         // ARTCC boundaries — drawn after radar so they appear on top
         if (ShowArtcc && _artccBoundaryGeometry != null)
-        {
-            System.Diagnostics.Debug.WriteLine(
-                $"Drawing ARTCC — geo type: {_artccBoundaryGeometry.GetType().Name}, " +
-                $"bounds: {_artccBoundaryGeometry.Bounds}");
             context.DrawGeometry(null, _artccPen, _artccBoundaryGeometry);
-        }
+
+        // Routes — drawn before aircraft so aircraft appear on top
+        DrawRoutes(context, width, height);
 
         // Map items
         DrawActiveMapItems(context, width, height);
 
         // Aircraft
         DrawAircraft(context, width, height);
+    }
+
+    private void ScheduleRadarRefresh()
+    {
+        if (!ShowWeather) return;
+
+        _radarRefreshTimer?.Dispose();
+        _radarRefreshTimer = new System.Threading.Timer(_ =>
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                RadarRefreshRequested?.Invoke(this, EventArgs.Empty));
+        }, null, TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
     }
 
     protected override void OnPointerMoved(PointerEventArgs e)
@@ -713,12 +722,7 @@ public class TsdRadarControl : Control
         }
 
         if (_hoveredCallsign != prevCallsign)
-        {
-            System.Diagnostics.Debug.WriteLine(
-                $"Hover changed: {prevCallsign ?? "none"} -> " +
-                $"{_hoveredCallsign ?? "none"}");
             InvalidateVisual();
-        }
     }
 
     protected override void OnPointerEntered(PointerEventArgs e)
@@ -761,18 +765,6 @@ public class TsdRadarControl : Control
         }
     }
 
-    private void ScheduleRadarRefresh()
-    {
-        if (!ShowWeather) return;
-
-        _radarRefreshTimer?.Dispose();
-        _radarRefreshTimer = new System.Threading.Timer(_ =>
-        {
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                RadarRefreshRequested?.Invoke(this, EventArgs.Empty));
-        }, null, TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
-    }
-
     private void DrawAircraft(DrawingContext context,
                                double width, double height)
     {
@@ -791,10 +783,8 @@ public class TsdRadarControl : Control
             DrawAircraftSymbol(context, pt, pilot.Heading, size, brush);
 
             if (_hoveredCallsign != null &&
-    _hoveredCallsign == pilot.Callsign)
+                _hoveredCallsign == pilot.Callsign)
             {
-                System.Diagnostics.Debug.WriteLine(
-                    $"Drawing datablock for {pilot.Callsign}");
                 DrawDataBlock(context, pt, pilot,
                     _dataBlockBrush, typeface);
             }
@@ -847,24 +837,18 @@ public class TsdRadarControl : Control
         Point pt, VatsimPilot pilot,
         IBrush textBrush, Typeface typeface)
     {
-        System.Diagnostics.Debug.WriteLine(
-            $"DrawDataBlock: brush={_dataBlockBrush.Color}, " +
-            $"pt={pt.X:F0},{pt.Y:F0}");
-
-        // Build lines list
         string altStr = pilot.Altitude >= 18000
             ? $"F{pilot.Altitude / 100:000}"
             : $"{pilot.Altitude / 100:000}";
 
         var linesList = new List<string>
-    {
-        pilot.Callsign,
-        $"{pilot.AircraftType,-4} {altStr}",
-        $"{pilot.GroundSpeed}",
-        pilot.Arrival
-    };
+        {
+            pilot.Callsign,
+            $"{pilot.AircraftType,-4} {altStr}",
+            $"{pilot.GroundSpeed}",
+            pilot.Arrival
+        };
 
-        // Add route with word wrapping if ShowRoute is on
         if (pilot.MatchedShowRoute &&
             !string.IsNullOrWhiteSpace(pilot.Route))
         {
@@ -886,7 +870,6 @@ public class TsdRadarControl : Control
             }
         }
 
-        // Draw each line
         var lines = linesList.ToArray();
         double lineHeight = 12.0;
         double bx = pt.X + 10;
@@ -949,138 +932,35 @@ public class TsdRadarControl : Control
         }
     }
 
-    private void ScheduleRadarRefresh()
-    {
-        if (!ShowWeather) return;
-
-        System.Diagnostics.Debug.WriteLine(
-            "TsdRadarControl: scheduling radar refresh in 5s");
-
-        _radarRefreshTimer?.Dispose();
-        _radarRefreshTimer = new System.Threading.Timer(_ =>
-        {
-            System.Diagnostics.Debug.WriteLine(
-                "TsdRadarControl: radar refresh timer fired");
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                RadarRefreshRequested?.Invoke(this, EventArgs.Empty));
-        }, null, TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
-    }
-
-    private void RebuildRenderCache()
-    {
-        var s = DisplaySettings;
-    
-        _backgroundBrush = new SolidColorBrush(Color.Parse(s.BackgroundColor));
-        _boundaryPen = new Pen(new SolidColorBrush(Color.Parse(s.BoundaryColor)), 0.8);
-        _sectorPen = new Pen(new SolidColorBrush(Color.Parse(s.ArtccColor)), 1.0);
-        _airportBrush = new SolidColorBrush(Color.Parse(s.AirportColor));
-        _vorBrush = new SolidColorBrush(Color.Parse(s.VorColor));
-        _vorPen = new Pen(_vorBrush, 1.0);
-        _ndbBrush = new SolidColorBrush(Color.Parse(s.NdbColor));
-        _ndbPen = new Pen(_ndbBrush, 1.0);
-        _fixBrush = new SolidColorBrush(Color.Parse(s.FixColor));
-        _fixPen = new Pen(_fixBrush, 0.8);
-        _traconBrush = new SolidColorBrush(Color.Parse(s.TraconColor));
-        _traconPen = new Pen(_traconBrush, 1.0);
-        _dataBlockBrush = new SolidColorBrush(Color.Parse(s.DataBlockColor));
-        _mapLabelBrush = new SolidColorBrush(Color.Parse(s.MapLabelColor));
-        _dataBlockTypeface = new Typeface(s.DataBlockFont);
-        _mapLabelTypeface = new Typeface(s.MapLabelFont);
-    }
-
-    public override void Render(DrawingContext context)
-    {
-        var width = Bounds.Width;
-        var height = Bounds.Height;
-        if (width <= 0 || height <= 0) return;
-
-        // Background
-        context.FillRectangle(_backgroundBrush, new Rect(0, 0, width, height));
-
-        // Rebuild if dirty
-        if (_geometriesDirty ||
-            Math.Abs(_cachedWidth - width) > 0.5 ||
-            Math.Abs(_cachedHeight - height) > 0.5)
-        {
-            RebuildGeometries(width, height);
-        }
-
-        // State boundaries
-        if (ShowStateBoundaries && _stateBoundaryGeometry != null)
-            context.DrawGeometry(null, _boundaryPen, _stateBoundaryGeometry);
-
-        // Country boundaries
-        if (ShowCountryBoundaries && _countryBoundaryGeometry != null)
-            context.DrawGeometry(null, _boundaryPen, _countryBoundaryGeometry);
-
-        // Sector boundaries
-        if (_sectorGeometry != null)
-            context.DrawGeometry(null, _sectorPen, _sectorGeometry);
-
-        // Radar overlay
-        if (ShowWeather && _radarBitmap != null)
-        {
-            var topLeft = LatLonToScreen(
-                RadarMaxLat, RadarMinLon, width, height);
-            var bottomRight = LatLonToScreen(
-                RadarMinLat, RadarMaxLon, width, height);
-
-            var destRect = new Rect(
-                topLeft.X, topLeft.Y,
-                bottomRight.X - topLeft.X,
-                bottomRight.Y - topLeft.Y);
-
-            using (context.PushOpacity(RadarOpacity))
-            {
-                context.DrawImage(_radarBitmap,
-                    new Rect(0, 0,
-                        _radarBitmap.PixelSize.Width,
-                        _radarBitmap.PixelSize.Height),
-                    destRect);
-            }
-        }
-
-        // Routes — drawn before aircraft so aircraft appear on top
-        DrawRoutes(context, width, height);
-
-        // Map items
-        DrawActiveMapItems(context, width, height);
-
-        // Aircraft
-        DrawAircraft(context, width, height);
-    }
-
     private void DrawRoutes(DrawingContext context,
-    double width, double height)
+        double width, double height)
     {
         foreach (var pilot in VisiblePilots)
         {
             if (!pilot.MatchedDrawRoute) continue;
-            if (pilot.ParsedRoute.Count < 2) continue;
+            if (pilot.ParsedRoute is null || pilot.ParsedRoute.Count < 2) continue;
 
             var brush = new SolidColorBrush(
                 Color.Parse(pilot.MatchedFilterColor));
             var pen = new Pen(brush, 1.0);
 
-            // Find the nearest waypoint ahead of the aircraft
             int nextWaypointIndex = FindNextWaypoint(
                 pilot.Lat, pilot.Lon, pilot.ParsedRoute);
 
             var geo = new StreamGeometry();
             using (var ctx = geo.Open())
             {
-                // Start from aircraft current position
                 var aircraftPt = LatLonToScreen(
                     pilot.Lat, pilot.Lon, width, height);
                 ctx.BeginFigure(aircraftPt, false);
 
-                // Draw to each remaining waypoint
                 for (int i = nextWaypointIndex;
-                     i < pilot.ParsedRoute.Count; i++)
+                    i < pilot.ParsedRoute.Count; i++)
                 {
+                    if (pilot.ParsedRoute[i] is null) continue;
                     ctx.LineTo(LatLonToScreen(
-                        pilot.ParsedRoute[i].Lat,
-                        pilot.ParsedRoute[i].Lon,
+                        pilot.ParsedRoute[i]!.Lat,
+                        pilot.ParsedRoute[i]!.Lon,
                         width, height));
                 }
                 ctx.EndFigure(false);
@@ -1094,7 +974,6 @@ public class TsdRadarControl : Control
         double pilotLat, double pilotLon,
         List<LatLon> route)
     {
-        // Find the closest waypoint to the aircraft
         double minDist = double.MaxValue;
         int closestIndex = 0;
 
@@ -1111,8 +990,6 @@ public class TsdRadarControl : Control
             }
         }
 
-        // Return the waypoint after the closest one
-        // so we don't draw back to already-passed waypoints
         return Math.Min(closestIndex + 1, route.Count - 1);
     }
 
