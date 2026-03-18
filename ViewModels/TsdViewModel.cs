@@ -138,10 +138,14 @@ public partial class TsdViewModel : ObservableObject, IDisposable
         int imgHeight = Math.Min(
             (int)(_lastScreenHeight * scale), 4096);
 
-        _ = RefreshRadarAsync(
+        RefreshRadarAsync(
             minLat - latPad, minLon - lonPad,
             maxLat + latPad, maxLon + lonPad,
-            imgWidth, imgHeight);
+            imgWidth, imgHeight)
+            .ContinueWith(t =>
+                System.Diagnostics.Debug.WriteLine(
+                    $"TsdViewModel: radar refresh failed — {t.Exception?.GetBaseException().Message}"),
+                System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
     }
 
     public void TriggerRadarRefresh()
@@ -166,10 +170,14 @@ public partial class TsdViewModel : ObservableObject, IDisposable
             $"{maxLat + latPad:F2},{maxLon + lonPad:F2} " +
             $"size {imgWidth}x{imgHeight}");
 
-        _ = RefreshRadarAsync(
+        RefreshRadarAsync(
             minLat - latPad, minLon - lonPad,
             maxLat + latPad, maxLon + lonPad,
-            imgWidth, imgHeight);
+            imgWidth, imgHeight)
+            .ContinueWith(t =>
+                System.Diagnostics.Debug.WriteLine(
+                    $"TsdViewModel: radar refresh failed — {t.Exception?.GetBaseException().Message}"),
+                System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
     }
 
     private double _lastScreenWidth = 1920;
