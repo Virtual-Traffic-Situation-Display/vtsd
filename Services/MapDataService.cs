@@ -544,4 +544,113 @@ public class MapDataService : IMapDataService
             $"MapDataService: loaded {result.Count} TRACON boundaries");
         return result;
     }
+
+    public List<ArtccBoundary> LoadArtccBoundaries()
+    {
+        var result = new List<ArtccBoundary>();
+        var filePath = Path.Combine(
+            AppContext.BaseDirectory, "Data", "ARB_SEG.csv");
+
+        if (!File.Exists(filePath))
+        {
+            System.Diagnostics.Debug.WriteLine(
+                "MapDataService: ARB_SEG.csv not found");
+            return result;
+        }
+
+        var boundaries = new Dictionary<string, ArtccBoundary>();
+
+        foreach (var line in File.ReadLines(filePath).Skip(1))
+        {
+            var fields = line.Split(',')
+                .Select(f => f.Trim().Trim('"'))
+                .ToArray();
+
+            if (fields.Length < 17) continue;
+
+            var altType = fields[4].Trim();
+            if (!altType.Equals("HIGH",
+                StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var id = fields[2].Trim();
+
+            if (!double.TryParse(fields[11],
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out double lat))
+                continue;
+
+            if (!double.TryParse(fields[16],
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out double lon))
+                continue;
+
+            // Wrap eastern hemisphere coordinates across the dateline
+            if (lon > 0)
+                lon = -(180 + (180 - lon));
+
+
+                if (!boundaries.TryGetValue(id, out var boundary))
+            {
+                boundary = new ArtccBoundary { Identifier = id };
+                boundaries[id] = boundary;
+                result.Add(boundary);
+            }
+
+            boundary.Points.Add(new LatLon(lat, lon));
+
+            // Check for "TO POINT OF BEGINNING" — marks end of a ring
+            // Add a duplicate of first point to close the shape
+            var description = fields.Length > 17
+                ? fields[17].Trim() : string.Empty;
+            if (description.Contains("TO POINT OF BEGINNING",
+                StringComparison.OrdinalIgnoreCase) &&
+                boundary.Points.Count > 1)
+            {
+                // Add sentinel null point to signal ring break
+                boundary.Points.Add(new LatLon(double.NaN, double.NaN));
+            }
+        }
+
+        System.Diagnostics.Debug.WriteLine(
+            $"MapDataService: loaded {result.Count} " +
+            $"high altitude ARTCC boundaries");
+        return result;
+    }
+
+    private static bool TryParseDms(string dms, out double degrees)
+    {
+        degrees = 0;
+        if (string.IsNullOrWhiteSpace(dms)) return false;
+
+        try
+        {
+            // Format: DDMMSSSSN or DDDMMSSSW
+            // Last char is hemisphere N/S/E/W
+            char hemi = dms[^1];
+            string digits = dms[..^1];
+
+            // Degrees: first 2 or 3 digits depending on lat/lon
+            bool isLon = hemi == 'E' || hemi == 'W';
+            int degLen = isLon ? 3 : 2;
+
+            int deg = int.Parse(digits[..degLen]);
+            int min = int.Parse(digits[degLen..(degLen + 2)]);
+            // Remaining digits are seconds * 100
+            double sec = int.Parse(digits[(degLen + 2)..]) / 100.0;
+
+            degrees = deg + min / 60.0 + sec / 3600.0;
+
+            if (hemi == 'S' || hemi == 'W')
+                degrees = -degrees;
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }
