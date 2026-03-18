@@ -177,14 +177,14 @@ public class MapDataService : IMapDataService
         return fields.ToArray();
     }
 
-    private static List<(double Lat, double Lon)> ParseRing(JsonElement ring)
+    private static List<LatLon> ParseRing(JsonElement ring)
     {
-        var points = new List<(double Lat, double Lon)>();
+        var points = new List<LatLon>();
         foreach (var coord in ring.EnumerateArray())
         {
             var lon = coord[0].GetDouble();
             var lat = coord[1].GetDouble();
-            points.Add((lat, lon));
+            points.Add(new LatLon { Lat = lat, Lon = lon });
         }
         return points;
     }
@@ -507,9 +507,7 @@ public class MapDataService : IMapDataService
 
                     if (type == "Polygon")
                     {
-                        var ring = ParseRing(coordinates[0])
-                            .Select(p => new LatLon { Lat = p.Lat, Lon = p.Lon })
-                            .ToList();
+                        var ring = ParseRing(coordinates[0]);
                         if (ring.Count > 0)
                             tracon.Rings.Add(ring);
                     }
@@ -519,9 +517,7 @@ public class MapDataService : IMapDataService
                         {
                             foreach (var ring in polygon.EnumerateArray())
                             {
-                                var points = ParseRing(ring)
-                                    .Select(p => new LatLon { Lat = p.Lat, Lon = p.Lon })
-                                    .ToList();
+                                var points = ParseRing(ring);
                                 if (points.Count > 0)
                                     tracon.Rings.Add(points);
                             }

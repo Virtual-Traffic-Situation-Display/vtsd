@@ -126,6 +126,5 @@ public class VatsimService : IVatsimService, IDisposable
     public void Dispose()
     {
         Stop();
-        _httpClient.Dispose();
     }
 }
