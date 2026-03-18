@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Threading.Tasks;
 
+namespace vTFMS.Services;
+
 public interface IWeatherService
 {
     event EventHandler? AutoRefreshTriggered;
