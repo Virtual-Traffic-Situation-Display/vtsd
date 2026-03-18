@@ -3,6 +3,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using vTFMS.ViewModels;
 using vTFMS.ViewModels.Panels;
+using System;
 
 namespace vTFMS.Views.Panels;
 
@@ -10,9 +11,16 @@ public partial class OverlaysPanelWindow : BasePanelWindow
 {
     private readonly TsdViewModel _tsdViewModel;
 
+    public OverlaysPanelWindow()
+    {
+        throw new InvalidOperationException(
+            "Use the constructor that takes a TsdViewModel.");
+    }
+    
     public OverlaysPanelWindow(TsdViewModel tsdViewModel)
     {
         _tsdViewModel = tsdViewModel;
+        
 
         var vm = new BasePanelViewModel { Title = "OVERLAYS" };
         DataContext = vm;
