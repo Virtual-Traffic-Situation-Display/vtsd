@@ -335,17 +335,23 @@ public partial class TsdViewModel : ObservableObject, IDisposable
 
     private void RefreshVisiblePilots(List<VatsimPilot> pilots)
     {
-        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        // Do all the heavy work off the UI thread
+        Task.Run(() =>
         {
-            VisiblePilots.Clear();
-
             var activeFilters = _flightFilters
                 .Where(f => f.Show &&
                     (!string.IsNullOrWhiteSpace(f.Arrival) ||
                      !string.IsNullOrWhiteSpace(f.Departure)))
                 .ToList();
 
-            if (!activeFilters.Any()) return;
+            if (!activeFilters.Any())
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    VisiblePilots.Clear());
+                return;
+            }
+
+            var matched = new List<VatsimPilot>();
 
             foreach (var pilot in pilots)
             {
@@ -354,29 +360,55 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                 bool matches = false;
                 foreach (var filter in activeFilters)
                 {
-                    bool arrivalMatch = string.IsNullOrWhiteSpace(filter.Arrival) ||
+                    bool arrivalMatch =
+                        string.IsNullOrWhiteSpace(filter.Arrival) ||
                         filter.Arrival
                             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                            .Any(a => pilot.Arrival.Contains(a.ToUpperInvariant(),
+                            .Any(a => pilot.Arrival.Contains(
+                                a.ToUpperInvariant(),
                                 StringComparison.OrdinalIgnoreCase));
 
-                    bool departureMatch = string.IsNullOrWhiteSpace(filter.Departure) ||
+                    bool departureMatch =
+                        string.IsNullOrWhiteSpace(filter.Departure) ||
                         filter.Departure
                             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                            .Any(d => pilot.Departure.Contains(d.ToUpperInvariant(),
+                            .Any(d => pilot.Departure.Contains(
+                                d.ToUpperInvariant(),
                                 StringComparison.OrdinalIgnoreCase));
 
                     if (arrivalMatch && departureMatch)
                     {
                         matches = true;
                         pilot.MatchedFilterColor = filter.Color;
+                        pilot.MatchedDrawRoute = filter.DrawRoute;
+                        pilot.MatchedShowRoute = filter.ShowRoute;
                         break;
                     }
                 }
 
                 if (matches)
-                    VisiblePilots.Add(pilot);
+                {
+                    // Resolve route off UI thread
+                    if (pilot.MatchedDrawRoute &&
+                        pilot.ParsedRoute.Count == 0 &&
+                        !string.IsNullOrWhiteSpace(pilot.Route))
+                    {
+                        pilot.ParsedRoute = _mapDataService.ResolveRoute(
+                            pilot.Departure,
+                            pilot.Route,
+                            pilot.Arrival);
+                    }
+                    matched.Add(pilot);
+                }
             }
+
+            // Only touch the UI collection on the UI thread
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                VisiblePilots.Clear();
+                foreach (var pilot in matched)
+                    VisiblePilots.Add(pilot);
+            });
         });
     }
 

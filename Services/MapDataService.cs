@@ -189,6 +189,74 @@ public class MapDataService : IMapDataService
         return points;
     }
 
+    public List<LatLon> ResolveRoute(string departure,
+    string route, string arrival)
+    {
+        var result = new List<LatLon>();
+
+        // Resolve departure airport
+        var dep = FindAirport(departure);
+        if (dep != null)
+            result.Add(new LatLon(dep.Lat, dep.Lon));
+
+        // Parse route tokens — skip airways
+        var tokens = route
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(t => !IsAirway(t))
+            .ToList();
+
+        foreach (var token in tokens)
+        {
+            // Try coordinate waypoint e.g. 65N010W
+            var coord = TryParseCoordWaypoint(token);
+            if (coord != null)
+            {
+                result.Add(coord);
+                continue;
+            }
+
+            // Try airport
+            var airport = FindAirport(token);
+            if (airport != null)
+            {
+                result.Add(new LatLon(airport.Lat, airport.Lon));
+                continue;
+            }
+
+            // Try navaid
+            var navaid = FindNavaid(token);
+            if (navaid != null)
+            {
+                result.Add(new LatLon(navaid.Lat, navaid.Lon));
+                continue;
+            }
+
+            // Try fix
+            var waypoint = FindWaypoint(token);
+            if (waypoint != null)
+                result.Add(new LatLon(waypoint.Lat, waypoint.Lon));
+        }
+
+        // Resolve arrival airport
+        var arr = FindAirport(arrival);
+        if (arr != null)
+            result.Add(new LatLon(arr.Lat, arr.Lon));
+
+        return result;
+    }
+
+    private static bool IsAirway(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return true;
+        if (token == "DCT") return true;
+
+        // Airways start with a letter followed by digits
+        // e.g. J146, Q13, V25, T289, Y12, Z4
+        return token.Length >= 2 &&
+               char.IsLetter(token[0]) &&
+               char.IsDigit(token[1]);
+    }
+
     public List<StateBoundary> LoadStateBoundaries()
     {
         var result = new List<StateBoundary>();
@@ -470,6 +538,36 @@ public class MapDataService : IMapDataService
     {
         _waypoints.TryGetValue(identifier.ToUpperInvariant(), out var waypoint);
         return waypoint;
+    }
+
+    private static LatLon? TryParseCoordWaypoint(string token)
+    {
+        // Format: DDNDDDe.g. 65N010W or 5530N07520W
+        try
+        {
+            // Pattern: digits + N/S + digits + E/W
+            int nIdx = token.IndexOfAny(new[] { 'N', 'S' });
+            int ewIdx = token.IndexOfAny(new[] { 'E', 'W' });
+
+            if (nIdx <= 0 || ewIdx <= nIdx) return null;
+
+            double lat = double.Parse(token[..nIdx]);
+            double lon = double.Parse(token[(nIdx + 1)..ewIdx]);
+
+            if (token[nIdx] == 'S') lat = -lat;
+            if (token[ewIdx] == 'W') lon = -lon;
+
+            // Sanity check
+            if (lat < -90 || lat > 90 ||
+                lon < -180 || lon > 180)
+                return null;
+
+            return new LatLon(lat, lon);
+        }
+        catch
+        {
+            return null;
+        }
     }
     public List<TraconBoundary> LoadTraconBoundaries()
     {
