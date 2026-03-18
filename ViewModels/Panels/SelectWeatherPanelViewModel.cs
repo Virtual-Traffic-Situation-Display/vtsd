@@ -36,7 +36,7 @@ public partial class SelectWeatherPanelViewModel : BasePanelViewModel
 
     public SelectWeatherPanelViewModel(TsdViewModel tsdViewModel)
     {
-        Title = "SELECT WEATHER";
+        Title = "Select Weather";
         _tsdViewModel = tsdViewModel;
     }
 

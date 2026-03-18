@@ -1,0 +1,9 @@
+<panels:BasePanelWindow
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:panels="clr-namespace:vTFMS.Views.Panels;assembly=vTFMS"
+    x:Class="vTFMS.Views.Panels.FlightCountPanelWindow"
+    Width="180" Height="80"
+    MinWidth="180" MinHeight="80"
+    CanResize="True">
+</panels:BasePanelWindow>

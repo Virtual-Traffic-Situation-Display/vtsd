@@ -76,6 +76,12 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _showArtcc = false;
 
+    [ObservableProperty]
+    private bool _showFlightCount = false;
+
+    public List<VatsimPilot> AllCurrentPilots =>
+    _vatsimService.CurrentPilots;
+
     public ObservableCollection<ArtccBoundary> ArtccBoundaries { get; } = new();
 
     public DisplaySettings DisplaySettings { get; set; } = new();
