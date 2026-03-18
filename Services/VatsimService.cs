@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Tasks;
 using vTFMS.Models;
 
 namespace vTFMS.Services;
@@ -14,31 +15,46 @@ public class VatsimService : IVatsimService, IDisposable
     private const string VatsimUrl =
         "https://data.vatsim.net/v3/vatsim-data.json";
     private Timer? _timer;
+    private CancellationTokenSource _cts = new();
 
     public event EventHandler<List<VatsimPilot>>? PilotsUpdated;
     public List<VatsimPilot> CurrentPilots { get; private set; } = new();
 
     public void Start()
     {
-        // Fetch immediately then every 60 seconds
-        _timer = new Timer(_ => FetchAsync(),
+        _cts = new CancellationTokenSource();
+        _timer = new Timer(_ => _ = FetchAsync(_cts.Token),
             null, TimeSpan.Zero, TimeSpan.FromSeconds(60));
     }
 
     public void Stop()
     {
+        _cts.Cancel();
         _timer?.Dispose();
         _timer = null;
     }
 
-    private async void FetchAsync()
+    private async Task FetchAsync(CancellationToken ct = default)
     {
         try
         {
-            var json = await _httpClient.GetStringAsync(VatsimUrl);
+            var response = await _httpClient
+                .GetAsync(VatsimUrl, ct);
+
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content
+                .ReadAsStringAsync(ct);
+
             var pilots = Parse(json);
+
             CurrentPilots = pilots;
             PilotsUpdated?.Invoke(this, pilots);
+        }
+        catch (OperationCanceledException)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                "VatsimService: fetch cancelled");
         }
         catch (Exception ex)
         {
@@ -62,7 +78,6 @@ public class VatsimService : IVatsimService, IDisposable
                 var gs = p.TryGetProperty("groundspeed", out var gsProp)
                     ? gsProp.GetInt32() : 0;
 
-                // Only airborne
                 if (gs <= 35) continue;
 
                 var pilot = new VatsimPilot
@@ -80,7 +95,6 @@ public class VatsimService : IVatsimService, IDisposable
                         ? hdg.GetInt32() : 0,
                 };
 
-                // Flight plan fields
                 if (p.TryGetProperty("flight_plan", out var fp) &&
                     fp.ValueKind == JsonValueKind.Object)
                 {
