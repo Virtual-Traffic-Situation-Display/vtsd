@@ -19,6 +19,9 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     private readonly Dictionary<string, MapItem> _navDataCache = new();
     private List<TraconBoundary> _allTracons = new();
 
+    public double LastScreenWidth => _lastScreenWidth;
+    public double LastScreenHeight => _lastScreenHeight;
+
     [ObservableProperty]
     private double _centerLat = 39.5;
 

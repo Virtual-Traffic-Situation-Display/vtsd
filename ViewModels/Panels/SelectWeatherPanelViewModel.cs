@@ -10,14 +10,6 @@ public partial class SelectWeatherPanelViewModel : BasePanelViewModel
 {
     private readonly TsdViewModel _tsdViewModel;
 
-    private double _screenWidth = 1920;
-    private double _screenHeight = 1080;
-
-    public void SetScreenSize(double width, double height)
-    {
-        _screenWidth = width;
-        _screenHeight = height;
-    }
 
     [ObservableProperty]
     private string _statusMessage = "Weather is off";

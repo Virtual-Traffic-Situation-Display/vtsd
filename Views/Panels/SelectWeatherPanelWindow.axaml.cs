@@ -117,9 +117,6 @@ public partial class SelectWeatherPanelWindow : BasePanelWindow
         var screen = Screens.Primary;
         if (screen != null)
         {
-            vm.SetScreenSize(
-                screen.Bounds.Width,
-                screen.Bounds.Height);
             _tsdViewModel.UpdateScreenSize(
                 screen.Bounds.Width,
                 screen.Bounds.Height);
