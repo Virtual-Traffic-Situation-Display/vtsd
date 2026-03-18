@@ -121,15 +121,14 @@ public partial class TsdViewModel : ObservableObject, IDisposable
         LoadAllData();
     }
 
-    private void OnAutoRefreshTriggered(object? sender, EventArgs e)
+    public void RefreshRadarForCurrentView()
     {
         if (!ShowWeather) return;
 
-        // Get current visible bounds
+        const double scale = 1.2;
         var (minLat, minLon, maxLat, maxLon) =
             GetVisibleBounds(_lastScreenWidth, _lastScreenHeight);
 
-        double scale = 1.2;
         double latPad = (maxLat - minLat) * (scale - 1) / 2;
         double lonPad = (maxLon - minLon) * (scale - 1) / 2;
 
@@ -144,40 +143,21 @@ public partial class TsdViewModel : ObservableObject, IDisposable
             imgWidth, imgHeight)
             .ContinueWith(t =>
                 System.Diagnostics.Debug.WriteLine(
-                    $"TsdViewModel: radar refresh failed — {t.Exception?.GetBaseException().Message}"),
+                    $"TsdViewModel: radar refresh failed — " +
+                    $"{t.Exception?.GetBaseException().Message}"),
                 System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
     }
 
     public void TriggerRadarRefresh()
     {
-        if (!ShowWeather) return;
-
-        var (minLat, minLon, maxLat, maxLon) =
-            GetVisibleBounds(_lastScreenWidth, _lastScreenHeight);
-
-        double scale = 1.2;
-        double latPad = (maxLat - minLat) * (scale - 1) / 2;
-        double lonPad = (maxLon - minLon) * (scale - 1) / 2;
-
-        int imgWidth = Math.Min(
-            (int)(_lastScreenWidth * scale), 4096);
-        int imgHeight = Math.Min(
-            (int)(_lastScreenHeight * scale), 4096);
-
         System.Diagnostics.Debug.WriteLine(
-            $"TriggerRadarRefresh: bounds " +
-            $"{minLat - latPad:F2},{minLon - lonPad:F2} to " +
-            $"{maxLat + latPad:F2},{maxLon + lonPad:F2} " +
-            $"size {imgWidth}x{imgHeight}");
+            "TsdViewModel: TriggerRadarRefresh called");
+        RefreshRadarForCurrentView();
+    }
 
-        RefreshRadarAsync(
-            minLat - latPad, minLon - lonPad,
-            maxLat + latPad, maxLon + lonPad,
-            imgWidth, imgHeight)
-            .ContinueWith(t =>
-                System.Diagnostics.Debug.WriteLine(
-                    $"TsdViewModel: radar refresh failed — {t.Exception?.GetBaseException().Message}"),
-                System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
+    private void OnAutoRefreshTriggered(object? sender, EventArgs e)
+    {
+        RefreshRadarForCurrentView();
     }
 
     private double _lastScreenWidth = 1920;
