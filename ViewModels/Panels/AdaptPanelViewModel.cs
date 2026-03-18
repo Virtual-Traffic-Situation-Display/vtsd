@@ -94,6 +94,9 @@ public partial class AdaptPanelViewModel : BasePanelViewModel
     [RelayCommand]
     private void Cancel()
     {
+        LoadFromSettings(_original);
+        _tsdViewModel.DisplaySettings = _original.Clone();
+        _tsdViewModel.ApplyDisplaySettings();
         OkRequested?.Invoke(this, EventArgs.Empty);
     }
 

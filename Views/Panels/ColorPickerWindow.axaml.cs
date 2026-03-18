@@ -9,24 +9,21 @@ namespace vTFMS.Views.Panels;
 
 public partial class ColorPickerWindow : BasePanelWindow
 {
-
-    public ColorPickerWindow()
-    {
-        throw new InvalidOperationException(
-            "Use the constructor that takes a color string.");
-    }
-
     public event EventHandler<string>? ColorSelected;
 
     public ColorPickerWindow(string currentColor = "#FFFFFF")
     {
+        var hex = currentColor?.Trim() ?? "#FFFFFF";
+        if (!hex.StartsWith("#"))
+            hex = "#" + hex;
+
         var vm = new BasePanelViewModel
         {
             Title = "SELECT COLOR"
         };
         DataContext = vm;
         InitializeComponent();
-        BuildContent(currentColor);
+        BuildContent(hex);
     }
 
     private void BuildContent(string currentColor)
@@ -35,22 +32,21 @@ public partial class ColorPickerWindow : BasePanelWindow
         try { initial = Avalonia.Media.Color.Parse(currentColor); }
         catch { initial = Avalonia.Media.Colors.White; }
 
-        // Preset colors
         var presets = new List<(string Name, string Hex)>
-    {
-        ("Black",   "#000000"),
-        ("Blue",    "#0000FF"),
-        ("Orange",  "#FF8C00"),
-        ("Red",     "#FF0000"),
-        ("Green",   "#008000"),
-        ("Gray",    "#808080"),
-        ("Yellow",  "#FFFF00"),
-        ("Cyan",    "#00CCFF"),
-        ("White",   "#FFFFFF"),
-        ("Purple",  "#800080"),
-        ("Magenta", "#FF00FF"),
-        ("Lime",    "#00FF00"),
-    };
+        {
+            ("Black",   "#000000"),
+            ("Blue",    "#0000FF"),
+            ("Orange",  "#FF8C00"),
+            ("Red",     "#FF0000"),
+            ("Green",   "#008000"),
+            ("Gray",    "#808080"),
+            ("Yellow",  "#FFFF00"),
+            ("Cyan",    "#00CCFF"),
+            ("White",   "#FFFFFF"),
+            ("Purple",  "#800080"),
+            ("Magenta", "#FF00FF"),
+            ("Lime",    "#00FF00"),
+        };
 
         var presetWrap = new WrapPanel
         {
@@ -83,12 +79,8 @@ public partial class ColorPickerWindow : BasePanelWindow
 
             ToolTip.SetTip(swatch, name);
 
-            // Clicking preset updates the color view
             swatch.PointerPressed += (_, _) =>
-            {
                 colorView.Color = Avalonia.Media.Color.Parse(hex);
-                swatch.BorderBrush = null;
-            };
 
             swatch.PointerEntered += (_, _) =>
                 swatch.BorderBrush = new SolidColorBrush(
@@ -99,7 +91,6 @@ public partial class ColorPickerWindow : BasePanelWindow
             presetWrap.Children.Add(swatch);
         }
 
-        // Buttons
         var applyBtn = new Button
         {
             Content = "Apply",
@@ -129,18 +120,18 @@ public partial class ColorPickerWindow : BasePanelWindow
 
         applyBtn.Click += (_, _) =>
         {
-            var hex = $"#{colorView.Color.R:X2}" +
-                      $"{colorView.Color.G:X2}" +
-                      $"{colorView.Color.B:X2}";
-            ColorSelected?.Invoke(this, hex);
+            var selected = $"#{colorView.Color.R:X2}" +
+                           $"{colorView.Color.G:X2}" +
+                           $"{colorView.Color.B:X2}";
+            ColorSelected?.Invoke(this, selected);
         };
 
         okBtn.Click += (_, _) =>
         {
-            var hex = $"#{colorView.Color.R:X2}" +
-                      $"{colorView.Color.G:X2}" +
-                      $"{colorView.Color.B:X2}";
-            ColorSelected?.Invoke(this, hex);
+            var selected = $"#{colorView.Color.R:X2}" +
+                           $"{colorView.Color.G:X2}" +
+                           $"{colorView.Color.B:X2}";
+            ColorSelected?.Invoke(this, selected);
             Close();
         };
 
