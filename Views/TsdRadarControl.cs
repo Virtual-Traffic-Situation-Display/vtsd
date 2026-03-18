@@ -332,12 +332,11 @@ public class TsdRadarControl : Control
             _geometriesDirty = true;
             InvalidateVisual();
 
+            if (change.OldValue is INotifyCollectionChanged oldCollection)
+                oldCollection.CollectionChanged -= OnCollectionChanged;
+
             if (change.NewValue is INotifyCollectionChanged newCollection)
-                newCollection.CollectionChanged += (_, _) =>
-                {
-                    _geometriesDirty = true;
-                    InvalidateVisual();
-                };
+                newCollection.CollectionChanged += OnCollectionChanged;
         }
         if (change.Property == RadarImageDataProperty)
         {
@@ -361,6 +360,12 @@ public class TsdRadarControl : Control
             }
             InvalidateVisual();
         }
+    }
+    
+    private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        _geometriesDirty = true;
+        InvalidateVisual();
     }
 
     private Point LatLonToScreen(double lat, double lon,
