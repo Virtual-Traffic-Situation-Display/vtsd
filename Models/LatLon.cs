@@ -1,4 +1,4 @@
-﻿namespace vTFMS.Models;
+namespace vTFMS.Models;
 
 public class LatLon
 {
