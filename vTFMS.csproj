@@ -19,6 +19,7 @@
 	  <None Remove="Data\na-countries.json" />
 	  <None Remove="Data\na-provinces.json" />
 	  <None Remove="Data\NAV_BASE.csv" />
+	  <None Remove="Data\STAR_RTE.csv" />
 	  <None Remove="Data\tracon-boundaries.json" />
   </ItemGroup>
 
@@ -31,6 +32,7 @@
     <EmbeddedResource Include="Data\na-countries.json" />
     <EmbeddedResource Include="Data\na-provinces.json" />
     <EmbeddedResource Include="Data\NAV_BASE.csv" />
+    <EmbeddedResource Include="Data\STAR_RTE.csv" />
     <EmbeddedResource Include="Data\tracon-boundaries.json" />
   </ItemGroup>
 

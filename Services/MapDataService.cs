@@ -189,11 +189,20 @@ public class MapDataService : IMapDataService
         return points;
     }
 
-    public List<StateBoundary> LoadStateBoundaries()
+    /// <summary>
+    /// Shared GeoJSON feature parser. Reads all features from a JSON document,
+    /// applies a filter, extracts a name, and returns StateBoundary objects
+    /// for each Polygon or MultiPolygon ring that passes the filter.
+    /// </summary>
+    private static List<StateBoundary> ParseGeoJsonStateBoundaries(
+        string resourceFileName,
+        Func<JsonElement, bool> featureFilter,
+        Func<JsonElement, string> nameSelector,
+        string errorLabel)
     {
         var result = new List<StateBoundary>();
 
-        using var reader = OpenResource("na-provinces.json");
+        using var reader = OpenResource(resourceFileName);
         if (reader == null) return result;
 
         try
@@ -206,20 +215,9 @@ public class MapDataService : IMapDataService
             {
                 try
                 {
-                    var properties = feature.GetProperty("properties");
+                    if (!featureFilter(feature)) continue;
 
-                    // Only keep US states
-                    var country = string.Empty;
-                    if (properties.TryGetProperty("admin", out var adminProp))
-                        country = adminProp.GetString() ?? string.Empty;
-
-                    if (country != "United States of America")
-                        continue;
-
-                    var name = string.Empty;
-                    if (properties.TryGetProperty("name", out var nameProp))
-                        name = nameProp.GetString() ?? string.Empty;
-
+                    var name = nameSelector(feature);
                     var geometry = feature.GetProperty("geometry");
                     var type = geometry.GetProperty("type").GetString();
                     var coordinates = geometry.GetProperty("coordinates");
@@ -251,15 +249,37 @@ public class MapDataService : IMapDataService
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine(
-                        $"MapDataService: skipping state feature — {ex.Message}");
+                        $"MapDataService: skipping {errorLabel} feature — {ex.Message}");
                 }
             }
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine(
-                $"MapDataService: failed to load state boundaries — {ex.Message}");
+                $"MapDataService: failed to load {errorLabel} — {ex.Message}");
         }
+
+        return result;
+    }
+
+    public List<StateBoundary> LoadStateBoundaries()
+    {
+        var result = ParseGeoJsonStateBoundaries(
+            "na-provinces.json",
+            feature =>
+            {
+                var props = feature.GetProperty("properties");
+                return props.TryGetProperty("admin", out var admin) &&
+                       admin.GetString() == "United States of America";
+            },
+            feature =>
+            {
+                var props = feature.GetProperty("properties");
+                return props.TryGetProperty("name", out var name)
+                    ? name.GetString() ?? string.Empty
+                    : string.Empty;
+            },
+            "state");
 
         System.Diagnostics.Debug.WriteLine(
             $"MapDataService: loaded {result.Count} state boundaries");
@@ -268,186 +288,61 @@ public class MapDataService : IMapDataService
 
     public List<StateBoundary> LoadCountryBoundaries()
     {
-        var result = new List<StateBoundary>();
+        // Canadian provinces
+        var result = ParseGeoJsonStateBoundaries(
+            "na-provinces.json",
+            feature =>
+            {
+                var props = feature.GetProperty("properties");
+                return props.TryGetProperty("admin", out var admin) &&
+                       admin.GetString() == "Canada";
+            },
+            feature =>
+            {
+                var props = feature.GetProperty("properties");
+                return props.TryGetProperty("name", out var name)
+                    ? name.GetString() ?? string.Empty
+                    : string.Empty;
+            },
+            "Canada province");
 
-        // Load Canadian provinces from admin-1 file
-        using (var reader = OpenResource("na-provinces.json"))
+        // Caribbean and Mexico
+        var caribbeanAndMexico = new HashSet<string>(
+            StringComparer.OrdinalIgnoreCase)
         {
-            if (reader != null)
+            "Mexico", "Cuba", "Jamaica", "Haiti", "Dominican Republic",
+            "Puerto Rico", "Bahamas", "Trinidad and Tobago", "Barbados",
+            "Saint Lucia", "Saint Vincent and the Grenadines", "Grenada",
+            "Antigua and Barbuda", "Dominica", "Saint Kitts and Nevis",
+            "Aruba", "Curacao", "Sint Maarten", "Turks and Caicos Islands",
+            "Cayman Islands", "British Virgin Islands", "U.S. Virgin Islands",
+            "Anguilla", "Montserrat", "Guadeloupe", "Martinique",
+            "Saint Barthelemy", "Saint Martin", "Belize", "Guatemala",
+            "Honduras", "El Salvador", "Nicaragua", "Costa Rica", "Panama"
+        };
+
+        var caribbean = ParseGeoJsonStateBoundaries(
+            "na-countries.json",
+            feature =>
             {
-                try
-                {
-                    var json = reader.ReadToEnd();
-                    var doc = JsonDocument.Parse(json);
-                    var features = doc.RootElement.GetProperty("features");
-
-                    foreach (var feature in features.EnumerateArray())
-                    {
-                        try
-                        {
-                            var properties = feature.GetProperty("properties");
-
-                            var country = string.Empty;
-                            if (properties.TryGetProperty("admin", out var adminProp))
-                                country = adminProp.GetString() ?? string.Empty;
-
-                            // Only Canada from the provinces file
-                            if (country != "Canada") continue;
-
-                            var name = string.Empty;
-                            if (properties.TryGetProperty("name", out var nameProp))
-                                name = nameProp.GetString() ?? string.Empty;
-
-                            var geometry = feature.GetProperty("geometry");
-                            var type = geometry.GetProperty("type").GetString();
-                            var coordinates = geometry.GetProperty("coordinates");
-
-                            if (type == "Polygon")
-                            {
-                                var boundary = new StateBoundary
-                                {
-                                    Name = name,
-                                    Points = ParseRing(coordinates[0])
-                                };
-                                if (boundary.Points.Count > 0)
-                                    result.Add(boundary);
-                            }
-                            else if (type == "MultiPolygon")
-                            {
-                                foreach (var polygon in coordinates.EnumerateArray())
-                                {
-                                    var boundary = new StateBoundary
-                                    {
-                                        Name = name,
-                                        Points = ParseRing(polygon[0])
-                                    };
-                                    if (boundary.Points.Count > 0)
-                                        result.Add(boundary);
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine(
-                                $"MapDataService: skipping Canada province — {ex.Message}");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine(
-                        $"MapDataService: failed to load Canada provinces — {ex.Message}");
-                }
-            }
-        }
-
-        // Load Mexico country outline from admin-0 file
-        // Load Mexico and Caribbean country outlines from admin-0 file
-        using (var reader = OpenResource("na-countries.json"))
-        {
-            if (reader != null)
+                var props = feature.GetProperty("properties");
+                string name = string.Empty;
+                if (props.TryGetProperty("NAME", out var n) ||
+                    props.TryGetProperty("name", out n))
+                    name = n.GetString() ?? string.Empty;
+                return caribbeanAndMexico.Contains(name);
+            },
+            feature =>
             {
-                try
-                {
-                    var json = reader.ReadToEnd();
-                    var doc = JsonDocument.Parse(json);
-                    var features = doc.RootElement.GetProperty("features");
+                var props = feature.GetProperty("properties");
+                if (props.TryGetProperty("NAME", out var n) ||
+                    props.TryGetProperty("name", out n))
+                    return n.GetString() ?? string.Empty;
+                return string.Empty;
+            },
+            "Caribbean/Mexico");
 
-                    var caribbeanAndMexico = new HashSet<string>(
-                        StringComparer.OrdinalIgnoreCase)
-            {
-                "Mexico",
-                "Cuba",
-                "Jamaica",
-                "Haiti",
-                "Dominican Republic",
-                "Puerto Rico",
-                "Bahamas",
-                "Trinidad and Tobago",
-                "Barbados",
-                "Saint Lucia",
-                "Saint Vincent and the Grenadines",
-                "Grenada",
-                "Antigua and Barbuda",
-                "Dominica",
-                "Saint Kitts and Nevis",
-                "Aruba",
-                "Curacao",
-                "Sint Maarten",
-                "Turks and Caicos Islands",
-                "Cayman Islands",
-                "British Virgin Islands",
-                "U.S. Virgin Islands",
-                "Anguilla",
-                "Montserrat",
-                "Guadeloupe",
-                "Martinique",
-                "Saint Barthelemy",
-                "Saint Martin",
-                "Belize",
-                "Guatemala",
-                "Honduras",
-                "El Salvador",
-                "Nicaragua",
-                "Costa Rica",
-                "Panama"
-            };
-
-                    foreach (var feature in features.EnumerateArray())
-                    {
-                        try
-                        {
-                            var properties = feature.GetProperty("properties");
-
-                            var name = string.Empty;
-                            if (properties.TryGetProperty("NAME", out var nameProp) ||
-                                properties.TryGetProperty("name", out nameProp))
-                                name = nameProp.GetString() ?? string.Empty;
-
-                            if (!caribbeanAndMexico.Contains(name)) continue;
-
-                            var geometry = feature.GetProperty("geometry");
-                            var type = geometry.GetProperty("type").GetString();
-                            var coordinates = geometry.GetProperty("coordinates");
-
-                            if (type == "Polygon")
-                            {
-                                var boundary = new StateBoundary
-                                {
-                                    Name = name,
-                                    Points = ParseRing(coordinates[0])
-                                };
-                                if (boundary.Points.Count > 0)
-                                    result.Add(boundary);
-                            }
-                            else if (type == "MultiPolygon")
-                            {
-                                foreach (var polygon in coordinates.EnumerateArray())
-                                {
-                                    var boundary = new StateBoundary
-                                    {
-                                        Name = name,
-                                        Points = ParseRing(polygon[0])
-                                    };
-                                    if (boundary.Points.Count > 0)
-                                        result.Add(boundary);
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine(
-                                $"MapDataService: skipping Caribbean feature — {ex.Message}");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine(
-                        $"MapDataService: failed to load Caribbean outlines — {ex.Message}");
-                }
-            }
-        }
+        result.AddRange(caribbean);
 
         System.Diagnostics.Debug.WriteLine(
             $"MapDataService: loaded {result.Count} country boundaries");
@@ -471,6 +366,87 @@ public class MapDataService : IMapDataService
         _waypoints.TryGetValue(identifier.ToUpperInvariant(), out var waypoint);
         return waypoint;
     }
+
+    public List<LatLon> ResolveRoute(string departure,
+        string route, string arrival)
+    {
+        var result = new List<LatLon>();
+
+        var dep = FindAirport(departure);
+        if (dep != null)
+            result.Add(new LatLon(dep.Lat, dep.Lon));
+
+        var tokens = route
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(t => !IsAirway(t))
+            .ToList();
+
+        foreach (var token in tokens)
+        {
+            var coord = TryParseCoordWaypoint(token);
+            if (coord != null) { result.Add(coord); continue; }
+
+            var airport = FindAirport(token);
+            if (airport != null)
+            {
+                result.Add(new LatLon(airport.Lat, airport.Lon));
+                continue;
+            }
+
+            var navaid = FindNavaid(token);
+            if (navaid != null)
+            {
+                result.Add(new LatLon(navaid.Lat, navaid.Lon));
+                continue;
+            }
+
+            var waypoint = FindWaypoint(token);
+            if (waypoint != null)
+                result.Add(new LatLon(waypoint.Lat, waypoint.Lon));
+        }
+
+        var arr = FindAirport(arrival);
+        if (arr != null)
+            result.Add(new LatLon(arr.Lat, arr.Lon));
+
+        return result;
+    }
+
+    private static bool IsAirway(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return true;
+        if (token == "DCT") return true;
+        return token.Length >= 2 &&
+               char.IsLetter(token[0]) &&
+               char.IsDigit(token[1]);
+    }
+
+    private static LatLon? TryParseCoordWaypoint(string token)
+    {
+        try
+        {
+            int nIdx = token.IndexOfAny(new[] { 'N', 'S' });
+            int ewIdx = token.IndexOfAny(new[] { 'E', 'W' });
+
+            if (nIdx <= 0 || ewIdx <= nIdx) return null;
+
+            double lat = double.Parse(token[..nIdx]);
+            double lon = double.Parse(token[(nIdx + 1)..ewIdx]);
+
+            if (token[nIdx] == 'S') lat = -lat;
+            if (token[ewIdx] == 'W') lon = -lon;
+
+            if (lat < -90 || lat > 90 || lon < -180 || lon > 180)
+                return null;
+
+            return new LatLon(lat, lon);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public List<TraconBoundary> LoadTraconBoundaries()
     {
         var result = new List<TraconBoundary>();
@@ -587,12 +563,10 @@ public class MapDataService : IMapDataService
                 out double lon))
                 continue;
 
-            // Wrap eastern hemisphere coordinates across the dateline
             if (lon > 0)
                 lon = -(180 + (180 - lon));
 
-
-                if (!boundaries.TryGetValue(id, out var boundary))
+            if (!boundaries.TryGetValue(id, out var boundary))
             {
                 boundary = new ArtccBoundary { Identifier = id };
                 boundaries[id] = boundary;
@@ -601,15 +575,12 @@ public class MapDataService : IMapDataService
 
             boundary.Points.Add(new LatLon(lat, lon));
 
-            // Check for "TO POINT OF BEGINNING" — marks end of a ring
-            // Add a duplicate of first point to close the shape
             var description = fields.Length > 17
                 ? fields[17].Trim() : string.Empty;
             if (description.Contains("TO POINT OF BEGINNING",
                 StringComparison.OrdinalIgnoreCase) &&
                 boundary.Points.Count > 1)
             {
-                // Add sentinel null point to signal ring break
                 boundary.Points.Add(new LatLon(double.NaN, double.NaN));
             }
         }
@@ -627,18 +598,14 @@ public class MapDataService : IMapDataService
 
         try
         {
-            // Format: DDMMSSSSN or DDDMMSSSW
-            // Last char is hemisphere N/S/E/W
             char hemi = dms[^1];
             string digits = dms[..^1];
 
-            // Degrees: first 2 or 3 digits depending on lat/lon
             bool isLon = hemi == 'E' || hemi == 'W';
             int degLen = isLon ? 3 : 2;
 
             int deg = int.Parse(digits[..degLen]);
             int min = int.Parse(digits[degLen..(degLen + 2)]);
-            // Remaining digits are seconds * 100
             double sec = int.Parse(digits[(degLen + 2)..]) / 100.0;
 
             degrees = deg + min / 60.0 + sec / 3600.0;

@@ -6,4 +6,60 @@
     x:Class="vTFMS.Views.Panels.ShowMapItemPanelWindow"
     x:DataType="vm:ShowMapItemPanelViewModel"
     Width="520" Height="320">
+
+  <Grid RowDefinitions="*,Auto"
+        ColumnDefinitions="*,8,180"
+        Margin="8">
+
+    <!-- Left: input area -->
+    <Grid Grid.Row="0" Grid.Column="0"
+          RowDefinitions="Auto,8,Auto,8,*">
+
+      <TextBlock Grid.Row="0"
+                 Text="Enter identifiers (space separated):"
+                 FontFamily="Arial" FontSize="11"/>
+
+      <TextBox Grid.Row="2"
+               Text="{Binding InputText}"
+               FontFamily="Arial" FontSize="11"
+               Height="120"
+               AcceptsReturn="True"
+               TextWrapping="Wrap"
+               VerticalAlignment="Top"/>
+
+      <Button Grid.Row="4"
+              Content="Add Typed Items to List"
+              Command="{Binding AddItemsCommand}"
+              FontFamily="Arial" FontSize="11"
+              HorizontalAlignment="Stretch"/>
+    </Grid>
+
+    <!-- Right: active items list -->
+    <Grid Grid.Row="0" Grid.Column="2"
+          RowDefinitions="Auto,8,*,8,Auto">
+
+      <TextBlock Grid.Row="0"
+                 Text="Map items to be shown:"
+                 FontFamily="Arial" FontSize="11"/>
+
+      <ListBox Grid.Row="2"
+               ItemsSource="{Binding ActiveMapItems}"
+               SelectedItem="{Binding SelectedItem}"
+               FontFamily="Arial" FontSize="11"/>
+
+      <Button Grid.Row="4"
+              Content="Remove Selected"
+              Command="{Binding RemoveSelectedCommand}"
+              FontFamily="Arial" FontSize="11"
+              HorizontalAlignment="Stretch"/>
+    </Grid>
+
+    <!-- Status bar spanning bottom -->
+    <TextBlock Grid.Row="1" Grid.ColumnSpan="3"
+               Text="{Binding StatusMessage}"
+               FontFamily="Arial" FontSize="10"
+               Margin="0,4,0,0"/>
+
+  </Grid>
+
 </panels:BasePanelWindow>

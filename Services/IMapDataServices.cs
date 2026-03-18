@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using vTFMS.Models;
 
 namespace vTFMS.Services;
@@ -12,4 +12,6 @@ public interface IMapDataService
     Waypoint? FindWaypoint(string identifier);
     List<TraconBoundary> LoadTraconBoundaries();
     List<ArtccBoundary> LoadArtccBoundaries();
+    List<LatLon> ResolveRoute(string departure, string route,
+                           string arrival);
 }

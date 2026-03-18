@@ -1,4 +1,6 @@
-﻿namespace vTFMS.Models;
+﻿using System.Collections.Generic;
+
+namespace vTFMS.Models;
 
 public class VatsimPilot
 {
@@ -11,6 +13,9 @@ public class VatsimPilot
     public string AircraftType { get; set; } = string.Empty;
     public string Departure { get; set; } = string.Empty;
     public string Arrival { get; set; } = string.Empty;
-
+    public string Route { get; set; } = string.Empty;
     public string MatchedFilterColor { get; set; } = "#FFFFFF";
+    public bool MatchedDrawRoute { get; set; } = false;
+    public bool MatchedShowRoute { get; set; } = false;
+    public List<LatLon> ParsedRoute { get; set; } = new();
 }

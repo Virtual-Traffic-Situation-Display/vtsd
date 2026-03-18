@@ -31,6 +31,8 @@ public class TsdRadarControl : Control
     private System.Threading.Timer? _radarRefreshTimer;
     private Point _currentMousePosition;
     private VatsimPilot? _hoveredPilot;
+    private string? _hoveredCallsign;
+
     private Avalonia.Media.Imaging.Bitmap? _radarBitmap;
 
     // Cached render objects
@@ -509,13 +511,13 @@ public class TsdRadarControl : Control
 
                 foreach (var point in artcc.Points)
                 {
-                    // NaN sentinel = end of ring, start new figure
+                    if (point is null) continue;
                     if (double.IsNaN(point.Lat) || double.IsNaN(point.Lon))
                     {
                         if (figure != null)
                         {
                             figure.IsClosed = true;
-                            path.Figures.Add(figure);
+                            path.Figures!.Add(figure);
                             figure = null;
                         }
                         continue;
@@ -534,16 +536,15 @@ public class TsdRadarControl : Control
                     }
                     else
                     {
-                        figure.Segments.Add(
+                        figure.Segments!.Add(
                             new LineSegment { Point = screenPt });
                     }
                 }
 
-                // Close any remaining open figure
                 if (figure != null)
                 {
                     figure.IsClosed = true;
-                    path.Figures.Add(figure);
+                    path.Figures!.Add(figure);
                 }
 
                 geo.Children.Add(path);
@@ -672,12 +673,10 @@ public class TsdRadarControl : Control
 
         // ARTCC boundaries — drawn after radar so they appear on top
         if (ShowArtcc && _artccBoundaryGeometry != null)
-        {
-            System.Diagnostics.Debug.WriteLine(
-                $"Drawing ARTCC — geo type: {_artccBoundaryGeometry.GetType().Name}, " +
-                $"bounds: {_artccBoundaryGeometry.Bounds}");
             context.DrawGeometry(null, _artccPen, _artccBoundaryGeometry);
-        }
+
+        // Routes — drawn before aircraft so aircraft appear on top
+        DrawRoutes(context, width, height);
 
         // Map items
         DrawActiveMapItems(context, width, height);
@@ -686,12 +685,25 @@ public class TsdRadarControl : Control
         DrawAircraft(context, width, height);
     }
 
+    private void ScheduleRadarRefresh()
+    {
+        if (!ShowWeather) return;
+
+        _radarRefreshTimer?.Dispose();
+        _radarRefreshTimer = new System.Threading.Timer(_ =>
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                RadarRefreshRequested?.Invoke(this, EventArgs.Empty));
+        }, null, TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
+    }
+
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
         _currentMousePosition = e.GetPosition(this);
 
-        var prev = _hoveredPilot;
+        var prevCallsign = _hoveredCallsign;
+        _hoveredCallsign = null;
         _hoveredPilot = null;
 
         foreach (var pilot in VisiblePilots)
@@ -704,11 +716,12 @@ public class TsdRadarControl : Control
             if (Math.Sqrt(dx * dx + dy * dy) <= 8.0)
             {
                 _hoveredPilot = pilot;
+                _hoveredCallsign = pilot.Callsign;
                 break;
             }
         }
 
-        if (_hoveredPilot != prev)
+        if (_hoveredCallsign != prevCallsign)
             InvalidateVisual();
     }
 
@@ -752,18 +765,6 @@ public class TsdRadarControl : Control
         }
     }
 
-    private void ScheduleRadarRefresh()
-    {
-        if (!ShowWeather) return;
-
-        _radarRefreshTimer?.Dispose();
-        _radarRefreshTimer = new System.Threading.Timer(_ =>
-        {
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                RadarRefreshRequested?.Invoke(this, EventArgs.Empty));
-        }, null, TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
-    }
-
     private void DrawAircraft(DrawingContext context,
                                double width, double height)
     {
@@ -781,9 +782,12 @@ public class TsdRadarControl : Control
 
             DrawAircraftSymbol(context, pt, pilot.Heading, size, brush);
 
-            if (_hoveredPilot == pilot)
+            if (_hoveredCallsign != null &&
+                _hoveredCallsign == pilot.Callsign)
+            {
                 DrawDataBlock(context, pt, pilot,
                     _dataBlockBrush, typeface);
+            }
         }
     }
 
@@ -837,7 +841,7 @@ public class TsdRadarControl : Control
             ? $"F{pilot.Altitude / 100:000}"
             : $"{pilot.Altitude / 100:000}";
 
-        var lines = new[]
+        var linesList = new List<string>
         {
             pilot.Callsign,
             $"{pilot.AircraftType,-4} {altStr}",
@@ -845,6 +849,28 @@ public class TsdRadarControl : Control
             pilot.Arrival
         };
 
+        if (pilot.MatchedShowRoute &&
+            !string.IsNullOrWhiteSpace(pilot.Route))
+        {
+            const int wrapWidth = 30;
+            var route = pilot.Route;
+            while (route.Length > 0)
+            {
+                if (route.Length <= wrapWidth)
+                {
+                    linesList.Add(route);
+                    break;
+                }
+
+                int breakAt = route.LastIndexOf(' ', wrapWidth);
+                if (breakAt <= 0) breakAt = wrapWidth;
+
+                linesList.Add(route[..breakAt].Trim());
+                route = route[breakAt..].Trim();
+            }
+        }
+
+        var lines = linesList.ToArray();
         double lineHeight = 12.0;
         double bx = pt.X + 10;
         double by = pt.Y - (lines.Length * lineHeight) / 2;
@@ -904,6 +930,67 @@ public class TsdRadarControl : Control
                 center.X - label.Width / 2,
                 center.Y - label.Height / 2));
         }
+    }
+
+    private void DrawRoutes(DrawingContext context,
+        double width, double height)
+    {
+        foreach (var pilot in VisiblePilots)
+        {
+            if (!pilot.MatchedDrawRoute) continue;
+            if (pilot.ParsedRoute is null || pilot.ParsedRoute.Count < 2) continue;
+
+            var brush = new SolidColorBrush(
+                Color.Parse(pilot.MatchedFilterColor));
+            var pen = new Pen(brush, 1.0);
+
+            int nextWaypointIndex = FindNextWaypoint(
+                pilot.Lat, pilot.Lon, pilot.ParsedRoute);
+
+            var geo = new StreamGeometry();
+            using (var ctx = geo.Open())
+            {
+                var aircraftPt = LatLonToScreen(
+                    pilot.Lat, pilot.Lon, width, height);
+                ctx.BeginFigure(aircraftPt, false);
+
+                for (int i = nextWaypointIndex;
+                    i < pilot.ParsedRoute.Count; i++)
+                {
+                    if (pilot.ParsedRoute[i] is null) continue;
+                    ctx.LineTo(LatLonToScreen(
+                        pilot.ParsedRoute[i]!.Lat,
+                        pilot.ParsedRoute[i]!.Lon,
+                        width, height));
+                }
+                ctx.EndFigure(false);
+            }
+
+            context.DrawGeometry(null, pen, geo);
+        }
+    }
+
+    private static int FindNextWaypoint(
+        double pilotLat, double pilotLon,
+        List<LatLon> route)
+    {
+        double minDist = double.MaxValue;
+        int closestIndex = 0;
+
+        for (int i = 0; i < route.Count; i++)
+        {
+            double dLat = route[i].Lat - pilotLat;
+            double dLon = route[i].Lon - pilotLon;
+            double dist = dLat * dLat + dLon * dLon;
+
+            if (dist < minDist)
+            {
+                minDist = dist;
+                closestIndex = i;
+            }
+        }
+
+        return Math.Min(closestIndex + 1, route.Count - 1);
     }
 
     private void DrawActiveMapItems(DrawingContext context,
