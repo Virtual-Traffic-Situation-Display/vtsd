@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Tasks;
 using vTFMS.Models;
 
 namespace vTFMS.Services;
@@ -20,8 +21,7 @@ public class VatsimService : IVatsimService, IDisposable
 
     public void Start()
     {
-        // Fetch immediately then every 60 seconds
-        _timer = new Timer(_ => FetchAsync(),
+        _timer = new Timer(_ => _ = FetchAsync(),
             null, TimeSpan.Zero, TimeSpan.FromSeconds(60));
     }
 
@@ -31,7 +31,7 @@ public class VatsimService : IVatsimService, IDisposable
         _timer = null;
     }
 
-    private async void FetchAsync()
+    private async Task FetchAsync()
     {
         try
         {
