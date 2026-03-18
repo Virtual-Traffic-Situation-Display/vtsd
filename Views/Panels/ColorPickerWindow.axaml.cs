@@ -9,6 +9,13 @@ namespace vTFMS.Views.Panels;
 
 public partial class ColorPickerWindow : BasePanelWindow
 {
+
+    public ColorPickerWindow()
+    {
+        throw new InvalidOperationException(
+            "Use the constructor that takes a color string.");
+    }
+
     public event EventHandler<string>? ColorSelected;
 
     public ColorPickerWindow(string currentColor = "#FFFFFF")

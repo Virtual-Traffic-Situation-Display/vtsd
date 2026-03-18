@@ -11,22 +11,22 @@ public partial class AdaptPanelViewModel : BasePanelViewModel
     private readonly TsdViewModel _tsdViewModel;
     private DisplaySettings _original = new();
 
-    [ObservableProperty] private string _backgroundColor;
-    [ObservableProperty] private string _boundaryColor;
-    [ObservableProperty] private string _traconColor;
-    [ObservableProperty] private string _artccColor;
-    [ObservableProperty] private string _airportColor;
-    [ObservableProperty] private string _vorColor;
-    [ObservableProperty] private string _ndbColor;
-    [ObservableProperty] private string _fixColor;
-    [ObservableProperty] private string _jetRoutesColor;
-    [ObservableProperty] private string _victorRoutesColor;
-    [ObservableProperty] private string _dataBlockFont;
+    [ObservableProperty] private string _backgroundColor = string.Empty;
+    [ObservableProperty] private string _boundaryColor = string.Empty;
+    [ObservableProperty] private string _traconColor = string.Empty;
+    [ObservableProperty] private string _artccColor = string.Empty;
+    [ObservableProperty] private string _airportColor = string.Empty;
+    [ObservableProperty] private string _vorColor = string.Empty;
+    [ObservableProperty] private string _ndbColor = string.Empty;
+    [ObservableProperty] private string _fixColor = string.Empty;
+    [ObservableProperty] private string _jetRoutesColor = string.Empty;
+    [ObservableProperty] private string _victorRoutesColor = string.Empty;
+    [ObservableProperty] private string _dataBlockFont = string.Empty;
     [ObservableProperty] private double _dataBlockFontSize;
-    [ObservableProperty] private string _mapLabelFont;
+    [ObservableProperty] private string _mapLabelFont = string.Empty;
     [ObservableProperty] private double _mapLabelFontSize;
-    [ObservableProperty] private string _dataBlockColor;
-    [ObservableProperty] private string _mapLabelColor;
+    [ObservableProperty] private string _dataBlockColor = string.Empty;
+    [ObservableProperty] private string _mapLabelColor = string.Empty;
 
     public AdaptPanelViewModel(TsdViewModel tsdViewModel)
     {

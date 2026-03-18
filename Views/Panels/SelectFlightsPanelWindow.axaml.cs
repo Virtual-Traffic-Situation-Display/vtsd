@@ -14,6 +14,12 @@ namespace vTFMS.Views.Panels;
 
 public partial class SelectFlightsPanelWindow : BasePanelWindow
 {
+    public SelectFlightsPanelWindow()
+    {
+        throw new InvalidOperationException(
+            "Use the constructor that takes a SelectFlightsPanelViewModel.");
+    }
+
     public SelectFlightsPanelWindow(SelectFlightsPanelViewModel vm)
     {
         vm.OkRequested += (_, _) => Close();

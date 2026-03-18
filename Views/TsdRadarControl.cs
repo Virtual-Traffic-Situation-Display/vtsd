@@ -28,11 +28,6 @@ public class TsdRadarControl : Control
     private double _cachedWidth;
     private double _cachedHeight;
 
-    private double _radarMinLat;
-    private double _radarMinLon;
-    private double _radarMaxLat;
-    private double _radarMaxLon;
-
     private System.Threading.Timer? _radarRefreshTimer;
 
     private Point _currentMousePosition;
