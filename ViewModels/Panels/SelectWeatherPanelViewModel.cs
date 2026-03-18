@@ -10,7 +10,6 @@ public partial class SelectWeatherPanelViewModel : BasePanelViewModel
 {
     private readonly TsdViewModel _tsdViewModel;
 
-
     [ObservableProperty]
     private string _statusMessage = "Weather is off";
 
@@ -22,6 +21,16 @@ public partial class SelectWeatherPanelViewModel : BasePanelViewModel
             _tsdViewModel.ShowWeather = value;
             OnPropertyChanged();
             StatusMessage = value ? "Fetching radar..." : "Weather is off";
+        }
+    }
+
+    public double RadarOpacity
+    {
+        get => _tsdViewModel.RadarOpacity;
+        set
+        {
+            _tsdViewModel.RadarOpacity = value;
+            OnPropertyChanged();
         }
     }
 
