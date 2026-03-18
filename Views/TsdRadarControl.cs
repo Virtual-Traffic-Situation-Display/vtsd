@@ -428,7 +428,7 @@ public class TsdRadarControl : Control
     }
 
     private Geometry BuildPolylineGeometry(
-        List<List<(double Lat, double Lon)>> polylines,
+        List<List<LatLon>> polylines,
         double width, double height)
     {
         var geo = new StreamGeometry();
