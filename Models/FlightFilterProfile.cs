@@ -15,9 +15,3 @@ public class FlightFilterProfile
     public List<MapItem> ActiveMapItems { get; set; } = new();
     public List<List<LatLon>> Rings { get; set; } = new();
 }
-
-public class LatLon
-{
-    public double Lat { get; set; }
-    public double Lon { get; set; }
-}
