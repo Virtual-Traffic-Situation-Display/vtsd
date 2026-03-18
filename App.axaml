@@ -18,6 +18,21 @@
     <Application.Resources>
         <ResourceDictionary>
             <converters:PinIconConverter x:Key="PinIconConverter"/>
+            <Color x:Key="PanelBackground">#ffe4c4</Color>
+            <Color x:Key="PanelBorder">#ede9e3</Color>
+            <Color x:Key="TitleBarBackground">#e1ddd8</Color>
+            <Color x:Key="TitleBarBorder">#545454</Color>
+            <Color x:Key="ForegroundPrimary">#040403</Color>
+            <SolidColorBrush x:Key="PanelBackgroundBrush"
+                Color="{StaticResource PanelBackground}"/>
+            <SolidColorBrush x:Key="PanelBorderBrush"
+                Color="{StaticResource PanelBorder}"/>
+            <SolidColorBrush x:Key="TitleBarBackgroundBrush"
+                Color="{StaticResource TitleBarBackground}"/>
+            <SolidColorBrush x:Key="TitleBarBorderBrush"
+                Color="{StaticResource TitleBarBorder}"/>
+            <SolidColorBrush x:Key="ForegroundPrimaryBrush"
+                Color="{StaticResource ForegroundPrimary}"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

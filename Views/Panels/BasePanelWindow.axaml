@@ -4,7 +4,7 @@
         xmlns:local="using:vTFMS.Converters"
         x:Class="vTFMS.Views.Panels.BasePanelWindow"
         x:DataType="vm:BasePanelViewModel"
-        Background="#ffe4c4"
+        Background="{StaticResource PanelBackgroundBrush}"
         TransparencyLevelHint="AcrylicBlur"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaChromeHints="NoChrome"
@@ -24,45 +24,45 @@
       <Setter Property="FontSize" Value="12"/>
     </Style>
     <Style Selector="Button.title-bar-btn:pointerover /template/ ContentPresenter">
-      <Setter Property="Background" Value="#545454"/>
+      <Setter Property="Background" Value="{StaticResource TitleBarBorderBrush}"/>
     </Style>
     <Style Selector="Button.title-bar-btn.pinned /template/ ContentPresenter">
-      <Setter Property="Background" Value="#545454"/>
+      <Setter Property="Background" Value="{StaticResource TitleBarBorderBrush}"/>
     </Style>
-      <!-- Force all text to black throughout the panel -->
-<Style Selector="TextBlock">
-    <Setter Property="Foreground" Value="#000000"/>
-</Style>
-<Style Selector="CheckBox">
-    <Setter Property="Foreground" Value="#000000"/>
-</Style>
-<Style Selector="Button">
-    <Setter Property="Foreground" Value="#000000"/>
-</Style>
-<Style Selector="TextBox">
-    <Setter Property="Foreground" Value="#000000"/>
-</Style>
-<Style Selector="ComboBox">
-    <Setter Property="Foreground" Value="#000000"/>
-</Style>
-<Style Selector="Slider">
-    <Setter Property="Foreground" Value="#000000"/>
-</Style>
-<Style Selector="Label">
-    <Setter Property="Foreground" Value="#000000"/>
-</Style>
+    <!-- Force all text to black throughout the panel -->
+    <Style Selector="TextBlock">
+      <Setter Property="Foreground" Value="#000000"/>
+    </Style>
+    <Style Selector="CheckBox">
+      <Setter Property="Foreground" Value="#000000"/>
+    </Style>
+    <Style Selector="Button">
+      <Setter Property="Foreground" Value="#000000"/>
+    </Style>
+    <Style Selector="TextBox">
+      <Setter Property="Foreground" Value="#000000"/>
+    </Style>
+    <Style Selector="ComboBox">
+      <Setter Property="Foreground" Value="#000000"/>
+    </Style>
+    <Style Selector="Slider">
+      <Setter Property="Foreground" Value="#000000"/>
+    </Style>
+    <Style Selector="Label">
+      <Setter Property="Foreground" Value="#000000"/>
+    </Style>
   </Window.Styles>
 
   <Grid RowDefinitions="32,*">
 
     <!-- Custom title bar -->
     <Grid Grid.Row="0"
-          Background="#e1ddd8"
+          Background="{StaticResource TitleBarBackgroundBrush}"
           PointerPressed="TitleBar_PointerPressed"
           ColumnDefinitions="*,Auto">
 
       <Border Grid.ColumnSpan="2"
-              BorderBrush="#545454"
+              BorderBrush="{StaticResource TitleBarBorderBrush}"
               BorderThickness="0,0,0,1"
               VerticalAlignment="Bottom"
               Height="1"/>
