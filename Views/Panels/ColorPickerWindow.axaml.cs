@@ -11,6 +11,12 @@ public partial class ColorPickerWindow : BasePanelWindow
 {
     public event EventHandler<string>? ColorSelected;
 
+    public ColorPickerWindow()
+    {
+        throw new InvalidOperationException(
+            "Use the constructor that takes a color string.");
+    }
+
     public ColorPickerWindow(string currentColor = "#FFFFFF")
     {
         var hex = currentColor?.Trim() ?? "#FFFFFF";

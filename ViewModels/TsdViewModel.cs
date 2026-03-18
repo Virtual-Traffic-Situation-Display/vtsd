@@ -19,6 +19,9 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     private readonly Dictionary<string, MapItem> _navDataCache = new();
     private List<TraconBoundary> _allTracons = new();
 
+    public double LastScreenWidth => _lastScreenWidth;
+    public double LastScreenHeight => _lastScreenHeight;
+
     [ObservableProperty]
     private double _centerLat = 39.5;
 
@@ -69,6 +72,11 @@ public partial class TsdViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private bool _vatsimConnected = false;
+
+    [ObservableProperty]
+    private bool _showArtcc = false;
+
+    public ObservableCollection<ArtccBoundary> ArtccBoundaries { get; } = new();
 
     public DisplaySettings DisplaySettings { get; set; } = new();
 
@@ -121,15 +129,14 @@ public partial class TsdViewModel : ObservableObject, IDisposable
         LoadAllData();
     }
 
-    private void OnAutoRefreshTriggered(object? sender, EventArgs e)
+    public void RefreshRadarForCurrentView()
     {
         if (!ShowWeather) return;
 
-        // Get current visible bounds
+        const double scale = 1.2;
         var (minLat, minLon, maxLat, maxLon) =
             GetVisibleBounds(_lastScreenWidth, _lastScreenHeight);
 
-        double scale = 1.2;
         double latPad = (maxLat - minLat) * (scale - 1) / 2;
         double lonPad = (maxLon - minLon) * (scale - 1) / 2;
 
@@ -144,40 +151,21 @@ public partial class TsdViewModel : ObservableObject, IDisposable
             imgWidth, imgHeight)
             .ContinueWith(t =>
                 System.Diagnostics.Debug.WriteLine(
-                    $"TsdViewModel: radar refresh failed — {t.Exception?.GetBaseException().Message}"),
+                    $"TsdViewModel: radar refresh failed — " +
+                    $"{t.Exception?.GetBaseException().Message}"),
                 System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
     }
 
     public void TriggerRadarRefresh()
     {
-        if (!ShowWeather) return;
-
-        var (minLat, minLon, maxLat, maxLon) =
-            GetVisibleBounds(_lastScreenWidth, _lastScreenHeight);
-
-        double scale = 1.2;
-        double latPad = (maxLat - minLat) * (scale - 1) / 2;
-        double lonPad = (maxLon - minLon) * (scale - 1) / 2;
-
-        int imgWidth = Math.Min(
-            (int)(_lastScreenWidth * scale), 4096);
-        int imgHeight = Math.Min(
-            (int)(_lastScreenHeight * scale), 4096);
-
         System.Diagnostics.Debug.WriteLine(
-            $"TriggerRadarRefresh: bounds " +
-            $"{minLat - latPad:F2},{minLon - lonPad:F2} to " +
-            $"{maxLat + latPad:F2},{maxLon + lonPad:F2} " +
-            $"size {imgWidth}x{imgHeight}");
+            "TsdViewModel: TriggerRadarRefresh called");
+        RefreshRadarForCurrentView();
+    }
 
-        RefreshRadarAsync(
-            minLat - latPad, minLon - lonPad,
-            maxLat + latPad, maxLon + lonPad,
-            imgWidth, imgHeight)
-            .ContinueWith(t =>
-                System.Diagnostics.Debug.WriteLine(
-                    $"TsdViewModel: radar refresh failed — {t.Exception?.GetBaseException().Message}"),
-                System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
+    private void OnAutoRefreshTriggered(object? sender, EventArgs e)
+    {
+        RefreshRadarForCurrentView();
     }
 
     private double _lastScreenWidth = 1920;
@@ -200,6 +188,9 @@ public partial class TsdViewModel : ObservableObject, IDisposable
         _allTracons = _mapDataService.LoadTraconBoundaries();
         System.Diagnostics.Debug.WriteLine(
             $"TsdViewModel: loaded {_allTracons.Count} TRACONs");
+
+        foreach (var b in _mapDataService.LoadArtccBoundaries())
+            ArtccBoundaries.Add(b);
     }
 
     public (bool Found, string Message) TryAddMapItems(string input)

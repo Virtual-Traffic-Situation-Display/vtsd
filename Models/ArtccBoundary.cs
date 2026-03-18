@@ -2,8 +2,8 @@
 
 namespace vTFMS.Models;
 
-public class SectorBoundary
+public class ArtccBoundary
 {
-    public string Name { get; set; } = string.Empty;
+    public string Identifier { get; set; } = string.Empty;
     public List<LatLon> Points { get; set; } = new();
 }
