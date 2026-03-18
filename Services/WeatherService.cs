@@ -34,9 +34,10 @@ public class WeatherService : IWeatherService, IDisposable
     }
 
     public async Task<byte[]?> FetchRadarAsync(
-        double minLat, double minLon,
-        double maxLat, double maxLon,
-        int width, int height)
+    double minLat, double minLon,
+    double maxLat, double maxLon,
+    int width, int height,
+    CancellationToken ct = default)
     {
         try
         {
@@ -60,13 +61,12 @@ public class WeatherService : IWeatherService, IDisposable
                 $"WeatherService: fetching — {url}");
 
             var response = await _httpClient
-                .GetAsync(url)
-                .WaitAsync(TimeSpan.FromSeconds(30));
+                .GetAsync(url, ct);
 
             response.EnsureSuccessStatusCode();
 
             var bytes = await response.Content
-                .ReadAsByteArrayAsync();
+                .ReadAsByteArrayAsync(ct);
 
             if (bytes.Length < 1000)
             {
@@ -80,6 +80,12 @@ public class WeatherService : IWeatherService, IDisposable
                 $"WeatherService: received {bytes.Length} bytes");
 
             return bytes;
+        }
+        catch (OperationCanceledException)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                "WeatherService: fetch cancelled");
+            return null;
         }
         catch (Exception ex)
         {

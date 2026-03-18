@@ -38,6 +38,11 @@ public partial class App : Application
     
             desktop.MainWindow.DataContext = mainViewModel;
             desktop.Exit += (_, _) => mainViewModel.Dispose();
+            desktop.Exit += (_, _) =>
+            {
+                vatsimService.Stop();
+                weatherService.Stop();
+            };
         }
     
         base.OnFrameworkInitializationCompleted();
