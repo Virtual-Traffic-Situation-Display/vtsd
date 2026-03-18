@@ -13,6 +13,111 @@ public class MapDataService : IMapDataService
 {
     private static Assembly Assembly => Assembly.GetExecutingAssembly();
 
+    private readonly Dictionary<string, Airport> _airports = new();
+    private readonly Dictionary<string, Navaid> _navaids = new();
+    private readonly Dictionary<string, Waypoint> _waypoints = new();
+
+    public MapDataService()
+    {
+        LoadAirports();
+        LoadNavaids();
+        LoadWaypoints();
+    }
+
+    private void LoadAirports()
+    {
+        foreach (var fields in ReadCsv("APT_BASE.csv"))
+        {
+            try
+            {
+                if (fields.Length < 25) continue;
+                if (!double.TryParse(fields[19], out double lat)) continue;
+                if (!double.TryParse(fields[24], out double lon)) continue;
+
+                var identifier = fields[4].Trim();
+                if (string.IsNullOrWhiteSpace(identifier)) continue;
+
+                _airports[identifier.ToUpperInvariant()] = new Airport
+                {
+                    Identifier = identifier,
+                    Name = fields[12].Trim(),
+                    Type = fields[2].Trim(),
+                    Lat = lat,
+                    Lon = lon
+                };
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"MapDataService: skipping airport row — {ex.Message}");
+            }
+        }
+        System.Diagnostics.Debug.WriteLine(
+            $"MapDataService: loaded {_airports.Count} airports");
+    }
+
+    private void LoadNavaids()
+    {
+        foreach (var fields in ReadCsv("NAV_BASE.csv"))
+        {
+            try
+            {
+                if (fields.Length < 32) continue;
+                if (!double.TryParse(fields[26], out double lat)) continue;
+                if (!double.TryParse(fields[31], out double lon)) continue;
+
+                var identifier = fields[1].Trim();
+                if (string.IsNullOrWhiteSpace(identifier)) continue;
+
+                _navaids[identifier.ToUpperInvariant()] = new Navaid
+                {
+                    Identifier = identifier,
+                    Name = fields[7].Trim(),
+                    Type = fields[2].Trim(),
+                    Lat = lat,
+                    Lon = lon
+                };
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"MapDataService: skipping navaid row — {ex.Message}");
+            }
+        }
+        System.Diagnostics.Debug.WriteLine(
+            $"MapDataService: loaded {_navaids.Count} navaids");
+    }
+
+    private void LoadWaypoints()
+    {
+        foreach (var fields in ReadCsv("FIX_BASE.csv"))
+        {
+            try
+            {
+                if (fields.Length < 15) continue;
+                if (!double.TryParse(fields[9], out double lat)) continue;
+                if (!double.TryParse(fields[14], out double lon)) continue;
+
+                var identifier = fields[1].Trim();
+                if (string.IsNullOrWhiteSpace(identifier)) continue;
+
+                _waypoints[identifier.ToUpperInvariant()] = new Waypoint
+                {
+                    Identifier = identifier,
+                    Lat = lat,
+                    Lon = lon
+                };
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"MapDataService: skipping waypoint row — {ex.Message}");
+            }
+        }
+        System.Diagnostics.Debug.WriteLine(
+            $"MapDataService: loaded {_waypoints.Count} waypoints");
+    }
+
     private static string? FindResource(string fileName)
     {
         return Assembly.GetManifestResourceNames()
@@ -351,93 +456,20 @@ public class MapDataService : IMapDataService
 
     public Airport? FindAirport(string identifier)
     {
-        foreach (var fields in ReadCsv("APT_BASE.csv"))
-        {
-            try
-            {
-                if (fields.Length < 25) continue;
-                if (!fields[4].Trim().Equals(identifier,
-                    StringComparison.OrdinalIgnoreCase)) continue;
-
-                if (!double.TryParse(fields[19], out double lat)) continue;
-                if (!double.TryParse(fields[24], out double lon)) continue;
-
-                return new Airport
-                {
-                    Identifier = fields[4].Trim(),
-                    Name = fields[12].Trim(),
-                    Type = fields[2].Trim(),
-                    Lat = lat,
-                    Lon = lon
-                };
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine(
-                    $"MapDataService: error searching airport — {ex.Message}");
-            }
-        }
-        return null;
+        _airports.TryGetValue(identifier.ToUpperInvariant(), out var airport);
+        return airport;
     }
 
     public Navaid? FindNavaid(string identifier)
     {
-        foreach (var fields in ReadCsv("NAV_BASE.csv"))
-        {
-            try
-            {
-                if (fields.Length < 32) continue;
-                if (!fields[1].Trim().Equals(identifier,
-                    StringComparison.OrdinalIgnoreCase)) continue;
-
-                if (!double.TryParse(fields[26], out double lat)) continue;
-                if (!double.TryParse(fields[31], out double lon)) continue;
-
-                return new Navaid
-                {
-                    Identifier = fields[1].Trim(),
-                    Name = fields[7].Trim(),
-                    Type = fields[2].Trim(),
-                    Lat = lat,
-                    Lon = lon
-                };
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine(
-                    $"MapDataService: error searching navaid — {ex.Message}");
-            }
-        }
-        return null;
+        _navaids.TryGetValue(identifier.ToUpperInvariant(), out var navaid);
+        return navaid;
     }
 
     public Waypoint? FindWaypoint(string identifier)
     {
-        foreach (var fields in ReadCsv("FIX_BASE.csv"))
-        {
-            try
-            {
-                if (fields.Length < 15) continue;
-                if (!fields[1].Trim().Equals(identifier,
-                    StringComparison.OrdinalIgnoreCase)) continue;
-
-                if (!double.TryParse(fields[9], out double lat)) continue;
-                if (!double.TryParse(fields[14], out double lon)) continue;
-
-                return new Waypoint
-                {
-                    Identifier = fields[1].Trim(),
-                    Lat = lat,
-                    Lon = lon
-                };
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine(
-                    $"MapDataService: error searching waypoint — {ex.Message}");
-            }
-        }
-        return null;
+        _waypoints.TryGetValue(identifier.ToUpperInvariant(), out var waypoint);
+        return waypoint;
     }
     public List<TraconBoundary> LoadTraconBoundaries()
     {
