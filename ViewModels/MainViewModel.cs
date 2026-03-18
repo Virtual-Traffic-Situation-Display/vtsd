@@ -13,7 +13,7 @@ using vTFMS.Views.Panels;
 
 namespace vTFMS.ViewModels;
 
-public partial class MainViewModel : ObservableObject
+public partial class MainViewModel : ObservableObject, IDisposable
 {
     private readonly IPanelWindowManager _panelManager;
     private readonly IProfileService _profileService;
@@ -213,4 +213,10 @@ public partial class MainViewModel : ObservableObject
 
     [RelayCommand]
     private void LoadProfile() { }
+
+    public void Dispose()
+    {
+        _clockTimer.Dispose();
+        TsdViewModel.Dispose();
+    }
 }
