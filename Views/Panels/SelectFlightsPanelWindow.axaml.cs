@@ -190,7 +190,7 @@ public partial class SelectFlightsPanelWindow : BasePanelWindow
 
         colorRect.PointerPressed += (_, e) =>
         {
-            var picker = new ColorPickerWindow();
+            var picker = new ColorPickerWindow(filter.Color);
             picker.ColorSelected += (_, hex) =>
             {
                 filter.Color = hex;

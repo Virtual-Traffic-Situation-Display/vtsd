@@ -36,6 +36,24 @@ public class TsdRadarControl : Control
 
     private Avalonia.Media.Imaging.Bitmap? _radarBitmap;
 
+    // Cached render objects — rebuilt when DisplaySettings changes
+    private SolidColorBrush _backgroundBrush = new(Colors.Black);
+    private Pen _boundaryPen = new(new SolidColorBrush(Colors.White), 0.8);
+    private Pen _sectorPen = new(new SolidColorBrush(Colors.Red), 1.0);
+    private SolidColorBrush _airportBrush = new(Colors.Cyan);
+    private Pen _vorPen = new(new SolidColorBrush(Colors.Orange), 1.0);
+    private SolidColorBrush _vorBrush = new(Colors.Orange);
+    private Pen _ndbPen = new(new SolidColorBrush(Colors.Magenta), 1.0);
+    private SolidColorBrush _ndbBrush = new(Colors.Magenta);
+    private Pen _fixPen = new(new SolidColorBrush(Colors.White), 0.8);
+    private SolidColorBrush _fixBrush = new(Colors.White);
+    private SolidColorBrush _traconBrush = new(Colors.Cyan);
+    private Pen _traconPen = new(new SolidColorBrush(Colors.Cyan), 1.0);
+    private Typeface _dataBlockTypeface = new("Courier New");
+    private Typeface _mapLabelTypeface = new("Courier New");
+    private SolidColorBrush _dataBlockBrush = new(Colors.Cyan);
+    private SolidColorBrush _mapLabelBrush = new(Colors.Cyan);
+
     public event EventHandler? RadarRefreshRequested;
 
     #region Styled Properties
@@ -283,6 +301,7 @@ public class TsdRadarControl : Control
     public TsdRadarControl()
     {
         Focusable = true;
+        RebuildRenderCache();
     }
 
     public static readonly StyledProperty<DisplaySettings>
@@ -357,6 +376,10 @@ public class TsdRadarControl : Control
                 _radarBitmap = null;
             }
             InvalidateVisual();
+        }
+        if (change.Property == DisplaySettingsProperty)
+        {
+            RebuildRenderCache();
         }
     }
     
@@ -498,10 +521,7 @@ public class TsdRadarControl : Control
     private void DrawAircraft(DrawingContext context,
                            double width, double height)
     {
-        var typeface = new Typeface("Courier New");
-        var dataBlockBg = new SolidColorBrush(Color.Parse("#000000"));
-        var dataBlockBorder = new Pen(
-            new SolidColorBrush(Color.Parse("#FFFFFF")), 0.5);
+        var typeface = _dataBlockTypeface;
         const double size = 4.0;
 
         foreach (var pilot in VisiblePilots)
@@ -511,11 +531,11 @@ public class TsdRadarControl : Control
 
             var brush = new SolidColorBrush(
                 Color.Parse(pilot.MatchedFilterColor));
-
+            
             DrawAircraftSymbol(context, pt, pilot.Heading, size, brush);
-
+            
             if (_hoveredPilot == pilot)
-                DrawDataBlock(context, pt, pilot, brush, typeface);
+                DrawDataBlock(context, pt, pilot, _dataBlockBrush, typeface);
         }
     }
 
@@ -620,12 +640,9 @@ public class TsdRadarControl : Control
     private void DrawTraconBoundary(DrawingContext context,
     MapItem item, double width, double height)
     {
-        var color = DisplaySettings.TraconColor;
-        var pen = new Pen(
-            new SolidColorBrush(Avalonia.Media.Color.Parse(color)), 1.0);
-        var typeface = new Typeface("Courier New");
-        var brush = new SolidColorBrush(
-            Avalonia.Media.Color.Parse(color));
+        var pen = _traconPen;
+        var typeface = _mapLabelTypeface;
+        var brush = _traconBrush;
 
         foreach (var ring in item.Rings)
         {
@@ -687,6 +704,28 @@ public class TsdRadarControl : Control
         }, null, TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
     }
 
+    private void RebuildRenderCache()
+    {
+        var s = DisplaySettings;
+    
+        _backgroundBrush = new SolidColorBrush(Color.Parse(s.BackgroundColor));
+        _boundaryPen = new Pen(new SolidColorBrush(Color.Parse(s.BoundaryColor)), 0.8);
+        _sectorPen = new Pen(new SolidColorBrush(Color.Parse(s.ArtccColor)), 1.0);
+        _airportBrush = new SolidColorBrush(Color.Parse(s.AirportColor));
+        _vorBrush = new SolidColorBrush(Color.Parse(s.VorColor));
+        _vorPen = new Pen(_vorBrush, 1.0);
+        _ndbBrush = new SolidColorBrush(Color.Parse(s.NdbColor));
+        _ndbPen = new Pen(_ndbBrush, 1.0);
+        _fixBrush = new SolidColorBrush(Color.Parse(s.FixColor));
+        _fixPen = new Pen(_fixBrush, 0.8);
+        _traconBrush = new SolidColorBrush(Color.Parse(s.TraconColor));
+        _traconPen = new Pen(_traconBrush, 1.0);
+        _dataBlockBrush = new SolidColorBrush(Color.Parse(s.DataBlockColor));
+        _mapLabelBrush = new SolidColorBrush(Color.Parse(s.MapLabelColor));
+        _dataBlockTypeface = new Typeface(s.DataBlockFont);
+        _mapLabelTypeface = new Typeface(s.MapLabelFont);
+    }
+
     public override void Render(DrawingContext context)
     {
         var width = Bounds.Width;
@@ -694,11 +733,7 @@ public class TsdRadarControl : Control
         if (width <= 0 || height <= 0) return;
 
         // Background
-        context.FillRectangle(
-            new SolidColorBrush(
-                Avalonia.Media.Color.Parse(
-                    DisplaySettings.BackgroundColor)),
-            new Rect(0, 0, width, height));
+        context.FillRectangle(_backgroundBrush, new Rect(0, 0, width, height));
 
         // Rebuild if dirty
         if (_geometriesDirty ||
@@ -710,25 +745,15 @@ public class TsdRadarControl : Control
 
         // State boundaries
         if (ShowStateBoundaries && _stateBoundaryGeometry != null)
-            context.DrawGeometry(null,
-                new Pen(new SolidColorBrush(
-                    Avalonia.Media.Color.Parse(
-                        DisplaySettings.BoundaryColor)), 0.8),
-                _stateBoundaryGeometry);
+            context.DrawGeometry(null, _boundaryPen, _stateBoundaryGeometry);
 
         // Country boundaries
         if (ShowCountryBoundaries && _countryBoundaryGeometry != null)
-            context.DrawGeometry(null,
-                new Pen(new SolidColorBrush(
-                    Avalonia.Media.Color.Parse(
-                        DisplaySettings.BoundaryColor)), 0.8),
-                _countryBoundaryGeometry);
+            context.DrawGeometry(null, _boundaryPen, _countryBoundaryGeometry);
 
         // Sector boundaries
         if (_sectorGeometry != null)
-            context.DrawGeometry(null,
-                new Pen(new SolidColorBrush(Color.Parse("#CC0000")), 1.0),
-                _sectorGeometry);
+            context.DrawGeometry(null, _sectorPen, _sectorGeometry);
 
         // Radar overlay
         if (ShowWeather && _radarBitmap != null)
@@ -762,18 +787,14 @@ public class TsdRadarControl : Control
     private void DrawActiveMapItems(DrawingContext context,
                                  double width, double height)
     {
-        var airportBrush = new SolidColorBrush(
-            Avalonia.Media.Color.Parse(DisplaySettings.AirportColor));
-        var vorBrush = new SolidColorBrush(
-            Avalonia.Media.Color.Parse(DisplaySettings.VorColor));
-        var ndbBrush = new SolidColorBrush(
-            Avalonia.Media.Color.Parse(DisplaySettings.NdbColor));
-        var fixBrush = new SolidColorBrush(
-            Avalonia.Media.Color.Parse(DisplaySettings.FixColor));
-        var vorPen = new Pen(vorBrush, 1.0);
-        var ndbPen = new Pen(ndbBrush, 1.0);
-        var fixPen = new Pen(fixBrush, 0.8);
-        var typeface = new Typeface("Courier New");
+        var airportBrush = _airportBrush;
+        var vorBrush = _vorBrush;
+        var ndbBrush = _ndbBrush;
+        var fixBrush = _fixBrush;
+        var vorPen = _vorPen;
+        var ndbPen = _ndbPen;
+        var fixPen = _fixPen;
+        var typeface = _mapLabelTypeface;
         const double half = 2.5;
         const double triSize = 5.0;
 
