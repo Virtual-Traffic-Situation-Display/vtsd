@@ -10,14 +10,6 @@ public partial class SelectWeatherPanelViewModel : BasePanelViewModel
 {
     private readonly TsdViewModel _tsdViewModel;
 
-    private double _screenWidth = 1920;
-    private double _screenHeight = 1080;
-
-    public void SetScreenSize(double width, double height)
-    {
-        _screenWidth = width;
-        _screenHeight = height;
-    }
 
     [ObservableProperty]
     private string _statusMessage = "Weather is off";
@@ -55,14 +47,16 @@ public partial class SelectWeatherPanelViewModel : BasePanelViewModel
             double scale = 1.2;
             var (minLat, minLon, maxLat, maxLon) =
                 _tsdViewModel.GetVisibleBounds(
-                    _screenWidth, _screenHeight);
+                    _tsdViewModel.LastScreenWidth,
+                    _tsdViewModel.LastScreenHeight);
 
             double latPad = (maxLat - minLat) * (scale - 1) / 2;
             double lonPad = (maxLon - minLon) * (scale - 1) / 2;
 
-            // Use actual screen resolution for sharpest image
-            int imgWidth = Math.Min((int)(_screenWidth * scale), 4096);
-            int imgHeight = Math.Min((int)(_screenHeight * scale), 4096);
+            int imgWidth = Math.Min(
+                (int)(_tsdViewModel.LastScreenWidth * scale), 4096);
+            int imgHeight = Math.Min(
+                (int)(_tsdViewModel.LastScreenHeight * scale), 4096);
 
             await _tsdViewModel.RefreshRadarAsync(
                 minLat - latPad,
