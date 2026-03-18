@@ -11,4 +11,6 @@ public interface IMapDataService
     Navaid? FindNavaid(string identifier);
     Waypoint? FindWaypoint(string identifier);
     List<TraconBoundary> LoadTraconBoundaries();
+    List<LatLon> ResolveRoute(string departure, string route,
+                           string arrival);
 }

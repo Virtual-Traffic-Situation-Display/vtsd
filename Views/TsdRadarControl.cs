@@ -33,6 +33,7 @@ public class TsdRadarControl : Control
     private Point _currentMousePosition;
 
     private VatsimPilot? _hoveredPilot;
+    private string? _hoveredCallsign;
 
     private Avalonia.Media.Imaging.Bitmap? _radarBitmap;
 
@@ -457,8 +458,8 @@ public class TsdRadarControl : Control
         base.OnPointerMoved(e);
         _currentMousePosition = e.GetPosition(this);
 
-        // Check if hovering over a pilot
-        var prev = _hoveredPilot;
+        var prevCallsign = _hoveredCallsign;
+        _hoveredCallsign = null;
         _hoveredPilot = null;
 
         foreach (var pilot in VisiblePilots)
@@ -471,12 +472,18 @@ public class TsdRadarControl : Control
             if (Math.Sqrt(dx * dx + dy * dy) <= 8.0)
             {
                 _hoveredPilot = pilot;
+                _hoveredCallsign = pilot.Callsign;
                 break;
             }
         }
 
-        if (_hoveredPilot != prev)
+        if (_hoveredCallsign != prevCallsign)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"Hover changed: {prevCallsign ?? "none"} -> " +
+                $"{_hoveredCallsign ?? "none"}");
             InvalidateVisual();
+        }
     }
 
     protected override void OnPointerEntered(PointerEventArgs e)
@@ -526,16 +533,23 @@ public class TsdRadarControl : Control
 
         foreach (var pilot in VisiblePilots)
         {
-            var pt = LatLonToScreen(pilot.Lat, pilot.Lon, width, height);
+            var pt = LatLonToScreen(
+                pilot.Lat, pilot.Lon, width, height);
             if (!IsOnScreen(pt, width, height)) continue;
 
             var brush = new SolidColorBrush(
                 Color.Parse(pilot.MatchedFilterColor));
-            
+
             DrawAircraftSymbol(context, pt, pilot.Heading, size, brush);
-            
-            if (_hoveredPilot == pilot)
-                DrawDataBlock(context, pt, pilot, _dataBlockBrush, typeface);
+
+            if (_hoveredCallsign != null &&
+    _hoveredCallsign == pilot.Callsign)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"Drawing datablock for {pilot.Callsign}");
+                DrawDataBlock(context, pt, pilot,
+                    _dataBlockBrush, typeface);
+            }
         }
     }
 
@@ -608,18 +622,47 @@ public class TsdRadarControl : Control
     Point pt, VatsimPilot pilot,
     IBrush textBrush, Typeface typeface)
     {
+        System.Diagnostics.Debug.WriteLine(
+            $"DrawDataBlock: brush={_dataBlockBrush.Color}, " +
+            $"pt={pt.X:F0},{pt.Y:F0}");
+
+        // Build lines list
         string altStr = pilot.Altitude >= 18000
             ? $"F{pilot.Altitude / 100:000}"
             : $"{pilot.Altitude / 100:000}";
 
-        var lines = new[]
-        {
+        var linesList = new List<string>
+    {
         pilot.Callsign,
         $"{pilot.AircraftType,-4} {altStr}",
         $"{pilot.GroundSpeed}",
         pilot.Arrival
     };
 
+        // Add route with word wrapping if ShowRoute is on
+        if (pilot.MatchedShowRoute &&
+            !string.IsNullOrWhiteSpace(pilot.Route))
+        {
+            const int wrapWidth = 30;
+            var route = pilot.Route;
+            while (route.Length > 0)
+            {
+                if (route.Length <= wrapWidth)
+                {
+                    linesList.Add(route);
+                    break;
+                }
+
+                int breakAt = route.LastIndexOf(' ', wrapWidth);
+                if (breakAt <= 0) breakAt = wrapWidth;
+
+                linesList.Add(route[..breakAt].Trim());
+                route = route[breakAt..].Trim();
+            }
+        }
+
+        // Draw each line
+        var lines = linesList.ToArray();
         double lineHeight = 12.0;
         double bx = pt.X + 10;
         double by = pt.Y - (lines.Length * lineHeight) / 2;
@@ -778,10 +821,80 @@ public class TsdRadarControl : Control
             }
         }
 
+        // Routes — drawn before aircraft so aircraft appear on top
+        DrawRoutes(context, width, height);
+
+        // Map items
         DrawActiveMapItems(context, width, height);
 
         // Aircraft
         DrawAircraft(context, width, height);
+    }
+
+    private void DrawRoutes(DrawingContext context,
+    double width, double height)
+    {
+        foreach (var pilot in VisiblePilots)
+        {
+            if (!pilot.MatchedDrawRoute) continue;
+            if (pilot.ParsedRoute.Count < 2) continue;
+
+            var brush = new SolidColorBrush(
+                Color.Parse(pilot.MatchedFilterColor));
+            var pen = new Pen(brush, 1.0);
+
+            // Find the nearest waypoint ahead of the aircraft
+            int nextWaypointIndex = FindNextWaypoint(
+                pilot.Lat, pilot.Lon, pilot.ParsedRoute);
+
+            var geo = new StreamGeometry();
+            using (var ctx = geo.Open())
+            {
+                // Start from aircraft current position
+                var aircraftPt = LatLonToScreen(
+                    pilot.Lat, pilot.Lon, width, height);
+                ctx.BeginFigure(aircraftPt, false);
+
+                // Draw to each remaining waypoint
+                for (int i = nextWaypointIndex;
+                     i < pilot.ParsedRoute.Count; i++)
+                {
+                    ctx.LineTo(LatLonToScreen(
+                        pilot.ParsedRoute[i].Lat,
+                        pilot.ParsedRoute[i].Lon,
+                        width, height));
+                }
+                ctx.EndFigure(false);
+            }
+
+            context.DrawGeometry(null, pen, geo);
+        }
+    }
+
+    private static int FindNextWaypoint(
+        double pilotLat, double pilotLon,
+        List<LatLon> route)
+    {
+        // Find the closest waypoint to the aircraft
+        double minDist = double.MaxValue;
+        int closestIndex = 0;
+
+        for (int i = 0; i < route.Count; i++)
+        {
+            double dLat = route[i].Lat - pilotLat;
+            double dLon = route[i].Lon - pilotLon;
+            double dist = dLat * dLat + dLon * dLon;
+
+            if (dist < minDist)
+            {
+                minDist = dist;
+                closestIndex = i;
+            }
+        }
+
+        // Return the waypoint after the closest one
+        // so we don't draw back to already-passed waypoints
+        return Math.Min(closestIndex + 1, route.Count - 1);
     }
 
     private void DrawActiveMapItems(DrawingContext context,

@@ -107,6 +107,9 @@ public class VatsimService : IVatsimService, IDisposable
                     pilot.Arrival = fp.TryGetProperty("arrival",
                         out var arr) ? arr.GetString() ?? string.Empty
                         : string.Empty;
+                    pilot.Route = fp.TryGetProperty("route",
+                        out var rt) ? rt.GetString() ?? string.Empty
+                        : string.Empty;
                 }
 
                 result.Add(pilot);
