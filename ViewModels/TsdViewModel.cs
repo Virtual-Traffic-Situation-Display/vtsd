@@ -70,6 +70,11 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _vatsimConnected = false;
 
+    [ObservableProperty]
+    private bool _showArtcc = false;
+
+    public ObservableCollection<ArtccBoundary> ArtccBoundaries { get; } = new();
+
     public DisplaySettings DisplaySettings { get; set; } = new();
 
     public void ApplyDisplaySettings()
@@ -200,6 +205,9 @@ public partial class TsdViewModel : ObservableObject, IDisposable
         _allTracons = _mapDataService.LoadTraconBoundaries();
         System.Diagnostics.Debug.WriteLine(
             $"TsdViewModel: loaded {_allTracons.Count} TRACONs");
+
+        foreach (var b in _mapDataService.LoadArtccBoundaries())
+            ArtccBoundaries.Add(b);
     }
 
     public (bool Found, string Message) TryAddMapItems(string input)

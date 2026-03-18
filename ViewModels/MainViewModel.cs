@@ -76,7 +76,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void OpenOverlays() =>
-        _panelManager.Open<OverlaysPanelWindow>();
+    _panelManager.OpenWithArgs(
+        new OverlaysPanelWindow(TsdViewModel));
 
     [RelayCommand]
     private void OpenRunwayLayout() =>
