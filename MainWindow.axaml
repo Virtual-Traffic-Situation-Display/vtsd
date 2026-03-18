@@ -119,6 +119,9 @@
             <MenuItem Header="Select Flights..."
                       FontFamily="Arial" FontSize="12"
                       Command="{Binding OpenSelectFlightsCommand}"/>
+            <MenuItem Header="Show/Hide Flight Count"
+          FontFamily="Arial" FontSize="12"
+          Command="{Binding ToggleFlightCountCommand}"/>
         </MenuItem>
 
         <MenuItem Header="Weather" Foreground="#040403"

@@ -24,6 +24,24 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public TsdViewModel TsdViewModel { get; }
 
+    private FlightCountPanelWindow? _flightCountWindow;
+
+    [RelayCommand]
+    private void ToggleFlightCount()
+    {
+        if (_flightCountWindow != null)
+        {
+            _flightCountWindow.Close();
+            _flightCountWindow = null;
+            return;
+        }
+
+        _flightCountWindow = new FlightCountPanelWindow(TsdViewModel);
+        _flightCountWindow.Closed += (_, _) =>
+            _flightCountWindow = null;
+        _flightCountWindow.Show(_mainWindow);
+    }
+
     [ObservableProperty]
     private string _currentTime = string.Empty;
 
