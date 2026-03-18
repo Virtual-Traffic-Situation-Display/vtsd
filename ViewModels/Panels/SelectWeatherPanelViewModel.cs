@@ -44,26 +44,8 @@ public partial class SelectWeatherPanelViewModel : BasePanelViewModel
 
         try
         {
-            double scale = 1.2;
-            var (minLat, minLon, maxLat, maxLon) =
-                _tsdViewModel.GetVisibleBounds(
-                    _tsdViewModel.LastScreenWidth,
-                    _tsdViewModel.LastScreenHeight);
-
-            double latPad = (maxLat - minLat) * (scale - 1) / 2;
-            double lonPad = (maxLon - minLon) * (scale - 1) / 2;
-
-            int imgWidth = Math.Min(
-                (int)(_tsdViewModel.LastScreenWidth * scale), 4096);
-            int imgHeight = Math.Min(
-                (int)(_tsdViewModel.LastScreenHeight * scale), 4096);
-
-            await _tsdViewModel.RefreshRadarAsync(
-                minLat - latPad,
-                minLon - lonPad,
-                maxLat + latPad,
-                maxLon + lonPad,
-                imgWidth, imgHeight);
+            await Task.Run(() =>
+                _tsdViewModel.RefreshRadarForCurrentView());
 
             StatusMessage = _tsdViewModel.RadarImageData != null
                 ? "Radar updated"
