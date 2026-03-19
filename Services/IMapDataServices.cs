@@ -16,8 +16,8 @@ public interface IMapDataService
                            string arrival);
 
     bool IsPointInPolygon(double lat, double lon,
-    List<LatLon> polygon);
+                          List<LatLon> polygon);
 
     bool IsPointInArtcc(double lat, double lon,
-    ArtccBoundary artcc);
+                        ArtccBoundary artcc);
 }

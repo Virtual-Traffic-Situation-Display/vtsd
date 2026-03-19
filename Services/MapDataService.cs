@@ -626,7 +626,7 @@ public class MapDataService : IMapDataService
     }
 
     public bool IsPointInArtcc(double lat, double lon,
-    ArtccBoundary artcc)
+                               ArtccBoundary artcc)
     {
         // Fast bounding box pre-check
         if (!artcc.IsInBoundingBox(lat, lon))
@@ -637,8 +637,8 @@ public class MapDataService : IMapDataService
     }
 
     public bool IsPointInPolygon(
-    double lat, double lon,
-    List<LatLon> polygon)
+        double lat, double lon,
+        List<LatLon> polygon)
     {
         int n = polygon.Count;
         bool inside = false;

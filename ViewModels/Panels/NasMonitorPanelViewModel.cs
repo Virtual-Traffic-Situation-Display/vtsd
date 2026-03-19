@@ -21,7 +21,7 @@ public class NasMonitorRow
     public List<NasMonitorCell> Cells { get; set; } = new();
 }
 
-public partial class NasMonitorPanelViewModel : BasePanelViewModel
+public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
 {
     private readonly TsdViewModel _tsdViewModel;
     private readonly IMapDataService _mapDataService;
@@ -91,6 +91,8 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel
     public ObservableCollection<NasMonitorRow> Rows { get; } = new();
     public List<string> TimeLabels { get; private set; } = new();
 
+    private readonly EventHandler _onPilotsRefreshed;
+
     public NasMonitorPanelViewModel(
         TsdViewModel tsdViewModel,
         IMapDataService mapDataService)
@@ -99,12 +101,17 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel
         _tsdViewModel = tsdViewModel;
         _mapDataService = mapDataService;
 
-        // Subscribe to VATSIM refresh
-        _tsdViewModel.VisiblePilots.CollectionChanged +=
-            (_, _) => { if (IsEnabled) _ = RecalculateAsync(); };
+        // Subscribe to VATSIM data refresh (not filtered pilots)
+        _onPilotsRefreshed = (_, _) => { if (IsEnabled) _ = RecalculateAsync(); };
+        _tsdViewModel.PilotsRefreshed += _onPilotsRefreshed;
 
         InitializeRows();
         BuildTimeLabels();
+    }
+
+    public void Dispose()
+    {
+        _tsdViewModel.PilotsRefreshed -= _onPilotsRefreshed;
     }
 
     private void InitializeRows()
@@ -189,7 +196,8 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel
         if (newColCount != Rows.FirstOrDefault()?.Cells.Count)
             InitializeRows();
 
-        var pilots = _tsdViewModel.AllCurrentPilots;
+        // Snapshot — VatsimService can replace CurrentPilots on another thread
+        var pilots = _tsdViewModel.AllCurrentPilots.ToList();
 
         await _tsdViewModel.ResolveAllRoutesAsync(pilots);
 
@@ -320,6 +328,7 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel
     {
         var settings = new NasMonitorSettings
         {
+            HorizonMinutes = HorizonMinutes,
             Thresholds = _thresholds.Values.ToList()
         };
 
@@ -368,6 +377,7 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel
             {
                 _thresholds = settings.Thresholds
                     .ToDictionary(t => t.Identifier);
+                HorizonMinutes = settings.HorizonMinutes;
                 OnPropertyChanged(nameof(Rows));
             }
         }

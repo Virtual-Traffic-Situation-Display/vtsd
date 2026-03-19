@@ -82,6 +82,9 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     public List<VatsimPilot> AllCurrentPilots =>
     _vatsimService.CurrentPilots;
 
+    /// <summary>Raised after every VATSIM data refresh, before filtering.</summary>
+    public event EventHandler? PilotsRefreshed;
+
     public ObservableCollection<ArtccBoundary> ArtccBoundaries { get; } = new();
 
     public DisplaySettings DisplaySettings { get; set; } = new();
@@ -355,6 +358,7 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     private void OnPilotsUpdated(object? sender, List<VatsimPilot> pilots)
     {
         VatsimConnected = pilots.Count > 0;
+        PilotsRefreshed?.Invoke(this, EventArgs.Empty);
         RefreshVisiblePilots(pilots);
     }
 

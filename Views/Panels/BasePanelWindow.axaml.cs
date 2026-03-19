@@ -17,7 +17,6 @@ public partial class BasePanelWindow : Window
         get => PanelContent?.Content;
         set
         {
-            System.Diagnostics.Debug.WriteLine($"Content set: {value?.GetType().Name ?? "null"}");
             // Don't intercept if it's the base Panel being set internally
             if (value is Panel)
             {
@@ -28,7 +27,10 @@ public partial class BasePanelWindow : Window
                 PanelContent.Content = value;
             else
                 Initialized += (_, _) =>
-                    PanelContent.Content = value;
+                {
+                    if (PanelContent != null)
+                        PanelContent.Content = value;
+                };
         }
     }
 

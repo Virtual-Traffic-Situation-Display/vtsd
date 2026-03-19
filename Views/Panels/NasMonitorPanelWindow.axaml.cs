@@ -37,7 +37,7 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
                 RebuildTable();
         };
 
-        Closed += (_, _) => { };
+        Closed += (_, _) => _vm.Dispose();
 
         RebuildTable();
     }

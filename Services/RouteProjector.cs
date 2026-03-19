@@ -94,6 +94,10 @@ public static class RouteProjector
         return bestIndex;
     }
 
+    // Planar approximation — treats lat/lon as Cartesian axes.
+    // At higher latitudes longitude degrees are shorter than latitude
+    // degrees, so the projection is slightly biased. Acceptable for
+    // CONUS segment-finding where waypoints are close together.
     private static LatLon ClosestPointOnSegment(
         double pLat, double pLon,
         double aLat, double aLon,

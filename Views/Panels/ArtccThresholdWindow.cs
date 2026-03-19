@@ -115,7 +115,7 @@ public class ArtccThresholdWindow : Window
         {
             if (int.TryParse(yellowBox.Text, out int y) &&
                 int.TryParse(redBox.Text, out int r) &&
-                y > 0 && r > 0)
+                y > 0 && r > 0 && y < r)
             {
                 ThresholdSet?.Invoke(this, (y, r));
                 Close();
@@ -126,6 +126,12 @@ public class ArtccThresholdWindow : Window
                     yellowBox.BorderBrush = new SolidColorBrush(Colors.Red);
                 if (!int.TryParse(redBox.Text, out _))
                     redBox.BorderBrush = new SolidColorBrush(Colors.Red);
+                if (int.TryParse(yellowBox.Text, out int yv) &&
+                    int.TryParse(redBox.Text, out int rv) && yv >= rv)
+                {
+                    yellowBox.BorderBrush = new SolidColorBrush(Colors.Red);
+                    redBox.BorderBrush = new SolidColorBrush(Colors.Red);
+                }
             }
         };
 
