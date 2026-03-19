@@ -110,6 +110,25 @@ public partial class TsdViewModel : ObservableObject, IDisposable
         RadarImageData = data;
     }
 
+    public async Task ResolveAllRoutesAsync(
+    List<VatsimPilot> pilots)
+    {
+        await Task.Run(() =>
+        {
+            foreach (var pilot in pilots)
+            {
+                if (pilot.ParsedRoute.Count > 0) continue;
+                if (string.IsNullOrWhiteSpace(pilot.Route))
+                    continue;
+
+                pilot.ParsedRoute = _mapDataService.ResolveRoute(
+                    pilot.Departure,
+                    pilot.Route,
+                    pilot.Arrival);
+            }
+        });
+    }
+
     public ObservableCollection<StateBoundary> StateBoundaries { get; } = new();
     public ObservableCollection<StateBoundary> CountryBoundaries { get; } = new();
     public ObservableCollection<SectorBoundary> Sectors { get; } = new();
