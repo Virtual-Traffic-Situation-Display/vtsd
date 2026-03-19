@@ -23,8 +23,17 @@ public class VatsimService : IVatsimService, IDisposable
     public void Start()
     {
         _cts = new CancellationTokenSource();
+
+        // Fetch immediately
+        _ = FetchAsync(_cts.Token);
+
+        // Always skip to 2 minutes from now, rounded to clean boundary
+        var now = DateTime.UtcNow;
+        var nextMinute = now.AddSeconds(60 - now.Second).AddMilliseconds(-now.Millisecond);
+        var delay = nextMinute.AddSeconds(60) - now;
+
         _timer = new Timer(_ => _ = FetchAsync(_cts.Token),
-            null, TimeSpan.Zero, TimeSpan.FromSeconds(60));
+            null, delay, TimeSpan.FromSeconds(60));
     }
 
     public void Stop()

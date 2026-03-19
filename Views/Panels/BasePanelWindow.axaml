@@ -29,7 +29,6 @@
     <Style Selector="Button.title-bar-btn.pinned /template/ ContentPresenter">
       <Setter Property="Background" Value="{StaticResource TitleBarBorderBrush}"/>
     </Style>
-    <!-- Force all text to black throughout the panel -->
     <Style Selector="TextBlock">
       <Setter Property="Foreground" Value="#000000"/>
     </Style>
@@ -53,10 +52,14 @@
     </Style>
   </Window.Styles>
 
-  <Grid RowDefinitions="32,*">
+  <Panel>
+    <!-- Content area with top padding for title bar -->
+    <ContentPresenter x:Name="PanelContent"
+                      Margin="0,32,0,0"/>
 
-    <!-- Custom title bar -->
-    <Grid Grid.Row="0"
+    <!-- Title bar overlay — always on top -->
+    <Grid Height="32"
+          VerticalAlignment="Top"
           Background="{StaticResource TitleBarBackgroundBrush}"
           PointerPressed="TitleBar_PointerPressed"
           ColumnDefinitions="*,Auto">
@@ -102,10 +105,5 @@
 
       </StackPanel>
     </Grid>
-
-    <!-- Content slot — child windows fill this -->
-    <TransitioningContentControl Grid.Row="1"
-                                  x:Name="PanelContent"/>
-
-  </Grid>
+  </Panel>
 </Window>

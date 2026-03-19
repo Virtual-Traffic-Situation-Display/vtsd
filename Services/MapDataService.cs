@@ -588,6 +588,10 @@ public class MapDataService : IMapDataService
         System.Diagnostics.Debug.WriteLine(
             $"MapDataService: loaded {result.Count} " +
             $"high altitude ARTCC boundaries");
+
+        foreach (var b in result)
+            b.ComputeBounds();
+
         return result;
     }
 
@@ -619,5 +623,41 @@ public class MapDataService : IMapDataService
         {
             return false;
         }
+    }
+
+    public bool IsPointInArtcc(double lat, double lon,
+                               ArtccBoundary artcc)
+    {
+        // Fast bounding box pre-check
+        if (!artcc.IsInBoundingBox(lat, lon))
+            return false;
+
+        // Full ray casting check
+        return IsPointInPolygon(lat, lon, artcc.Points);
+    }
+
+    public bool IsPointInPolygon(
+        double lat, double lon,
+        List<LatLon> polygon)
+    {
+        int n = polygon.Count;
+        bool inside = false;
+
+        for (int i = 0, j = n - 1; i < n; j = i++)
+        {
+            double xi = polygon[i].Lon;
+            double yi = polygon[i].Lat;
+            double xj = polygon[j].Lon;
+            double yj = polygon[j].Lat;
+
+            bool intersect =
+                ((yi > lat) != (yj > lat)) &&
+                (lon < (xj - xi) * (lat - yi) /
+                    (yj - yi) + xi);
+
+            if (intersect) inside = !inside;
+        }
+
+        return inside;
     }
 }

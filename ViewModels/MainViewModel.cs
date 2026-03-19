@@ -18,7 +18,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly IPanelWindowManager _panelManager;
     private readonly IProfileService _profileService;
     private readonly IWeatherService _weatherService;
+    private readonly IMapDataService _mapDataService;
     private readonly Window _mainWindow;
+
 
     public bool VatsimConnected => TsdViewModel.VatsimConnected;
 
@@ -59,6 +61,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _panelManager = panelManager;
         _profileService = profileService;
         _weatherService = weatherService;
+        _mapDataService = mapDataService;
         _mainWindow = mainWindow;
         TsdViewModel = new TsdViewModel(mapDataService, vatsimService, weatherService);
 
@@ -124,6 +127,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void OpenAdapt() =>
     _panelManager.OpenWithArgs(
         new AdaptPanelWindow(TsdViewModel));
+
+    [RelayCommand]
+    private void OpenNasMonitor() =>
+    _panelManager.OpenWithArgs(
+        new NasMonitorPanelWindow(
+            TsdViewModel, _mapDataService));
 
     // ── Filters commands ──────────────────────────────────────
 

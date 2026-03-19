@@ -123,6 +123,13 @@
                   Command="{Binding ToggleFlightCountCommand}"/>
       </MenuItem>
 
+    <MenuItem Header="Alerts" Foreground="{StaticResource ForegroundPrimaryBrush}"
+              FontFamily="Arial" FontSize="13">
+        <MenuItem Header="NAS Monitor"
+          FontFamily="Arial" FontSize="12"
+          Command="{Binding OpenNasMonitorCommand}"/>
+    </MenuItem>
+
       <MenuItem Header="Weather" Foreground="{StaticResource ForegroundPrimaryBrush}"
                 FontFamily="Arial" FontSize="13">
         <MenuItem Header="Select Weather"

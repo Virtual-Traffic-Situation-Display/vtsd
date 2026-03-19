@@ -14,4 +14,10 @@ public interface IMapDataService
     List<ArtccBoundary> LoadArtccBoundaries();
     List<LatLon> ResolveRoute(string departure, string route,
                            string arrival);
+
+    bool IsPointInPolygon(double lat, double lon,
+                          List<LatLon> polygon);
+
+    bool IsPointInArtcc(double lat, double lon,
+                        ArtccBoundary artcc);
 }

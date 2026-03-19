@@ -82,6 +82,9 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     public List<VatsimPilot> AllCurrentPilots =>
     _vatsimService.CurrentPilots;
 
+    /// <summary>Raised after every VATSIM data refresh, before filtering.</summary>
+    public event EventHandler? PilotsRefreshed;
+
     public ObservableCollection<ArtccBoundary> ArtccBoundaries { get; } = new();
 
     public DisplaySettings DisplaySettings { get; set; } = new();
@@ -108,6 +111,25 @@ public partial class TsdViewModel : ObservableObject, IDisposable
         var data = await _weatherService.FetchRadarAsync(
             minLat, minLon, maxLat, maxLon, width, height);
         RadarImageData = data;
+    }
+
+    public async Task ResolveAllRoutesAsync(
+    List<VatsimPilot> pilots)
+    {
+        await Task.Run(() =>
+        {
+            foreach (var pilot in pilots)
+            {
+                if (pilot.ParsedRoute.Count > 0) continue;
+                if (string.IsNullOrWhiteSpace(pilot.Route))
+                    continue;
+
+                pilot.ParsedRoute = _mapDataService.ResolveRoute(
+                    pilot.Departure,
+                    pilot.Route,
+                    pilot.Arrival);
+            }
+        });
     }
 
     public ObservableCollection<StateBoundary> StateBoundaries { get; } = new();
@@ -336,6 +358,7 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     private void OnPilotsUpdated(object? sender, List<VatsimPilot> pilots)
     {
         VatsimConnected = pilots.Count > 0;
+        PilotsRefreshed?.Invoke(this, EventArgs.Empty);
         RefreshVisiblePilots(pilots);
     }
 

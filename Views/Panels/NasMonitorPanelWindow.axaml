@@ -1,0 +1,100 @@
+<panels:BasePanelWindow
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:panels="using:vTFMS.Views.Panels"
+    xmlns:vm="using:vTFMS.ViewModels.Panels"
+    x:Class="vTFMS.Views.Panels.NasMonitorPanelWindow"
+    x:DataType="vm:NasMonitorPanelViewModel"
+    Width="600" Height="400"
+    MinWidth="300" MinHeight="200">
+
+  <Grid RowDefinitions="Auto,Auto,*" Margin="4">
+
+    <!-- Top toolbar — Enable/Disable dropdown and horizon slider -->
+    <Grid Grid.Row="0"
+          ColumnDefinitions="Auto,*,Auto,Auto"
+          Margin="4,4,4,4">
+
+      <!-- Enable/Disable split button -->
+      <SplitButton Grid.Column="0"
+             Content="{Binding EnableButtonText}"
+             Command="{Binding ToggleEnableCommand}"
+             FontFamily="Arial" FontSize="11"
+             Margin="0,0,8,0">
+  <SplitButton.Flyout>
+    <MenuFlyout>
+      <MenuItem Header="{Binding EnableButtonText}"
+                Command="{Binding ToggleEnableCommand}"/>
+      <Separator/>
+      <MenuItem Header="Save"
+                Command="{Binding SaveCommand}"/>
+      <MenuItem Header="Save As"
+                Command="{Binding SaveAsCommand}"/>
+      <MenuItem Header="Load"
+                Command="{Binding LoadCommand}"/>
+    </MenuFlyout>
+  </SplitButton.Flyout>
+</SplitButton>
+
+      <!-- Horizon slider -->
+      <StackPanel Grid.Column="1"
+                  Orientation="Horizontal"
+                  VerticalAlignment="Center">
+        <TextBlock Text="Horizon:"
+                   FontFamily="Arial" FontSize="11"
+                   VerticalAlignment="Center"
+                   Margin="0,0,6,0"/>
+        <Slider x:Name="HorizonSlider"
+        Minimum="60" Maximum="480"
+        Value="{Binding HorizonMinutes}"
+        TickFrequency="15"
+        IsSnapToTickEnabled="True"
+        Width="150"
+        VerticalAlignment="Center"
+        PointerPressed="HorizonSlider_PointerPressed"
+        PointerReleased="HorizonSlider_PointerReleased"/>
+
+<TextBlock Text="{Binding #HorizonSlider.Value,
+             StringFormat={}{0:0} min}"
+           FontFamily="Arial" FontSize="11"
+           VerticalAlignment="Center"
+           Margin="6,0,0,0"
+           Width="50"/>
+      </StackPanel>
+
+      <!-- Resource warning -->
+      <TextBlock Grid.Column="2"
+                 Text="⚠ &gt;3hr: high resource usage"
+                 FontFamily="Arial" FontSize="10"
+                 Foreground="#CC6600"
+                 FontWeight="Bold"
+                 VerticalAlignment="Center"
+                 Margin="8,0,0,0"
+                 IsVisible="{Binding ShowResourceWarning}"/>
+
+    </Grid>
+
+    <!-- Column headers — built in code-behind since dynamic -->
+    <ScrollViewer Grid.Row="1"
+                  HorizontalScrollBarVisibility="Auto"
+                  VerticalScrollBarVisibility="Disabled"
+                  x:Name="HeaderScroll">
+      <ItemsControl x:Name="HeaderRow"
+                    FontFamily="Courier New"
+                    FontSize="11"
+                    FontWeight="Bold"/>
+    </ScrollViewer>
+
+    <!-- Data rows -->
+    <ScrollViewer Grid.Row="2"
+                  HorizontalScrollBarVisibility="Auto"
+                  VerticalScrollBarVisibility="Auto"
+                  x:Name="DataScroll">
+      <ItemsControl x:Name="DataRows"
+                    FontFamily="Courier New"
+                    FontSize="11"/>
+    </ScrollViewer>
+
+  </Grid>
+
+</panels:BasePanelWindow>
