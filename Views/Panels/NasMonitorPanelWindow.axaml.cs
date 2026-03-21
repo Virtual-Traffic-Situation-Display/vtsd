@@ -13,8 +13,6 @@ namespace vTFMS.Views.Panels;
 public partial class NasMonitorPanelWindow : BasePanelWindow
 {
     private readonly NasMonitorPanelViewModel _vm;
-    private bool _sliderDragging = false;
-
     public NasMonitorPanelWindow()
     {
         throw new InvalidOperationException(
@@ -29,6 +27,15 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
         DataContext = _vm;
         InitializeComponent();
 
+        // Sync horizontal scroll between header and data
+        DataScroll.ScrollChanged += (_, e) =>
+            HeaderScroll.Offset = new Avalonia.Vector(
+                DataScroll.Offset.X, HeaderScroll.Offset.Y);
+        
+        HeaderScroll.ScrollChanged += (_, e) =>
+            DataScroll.Offset = new Avalonia.Vector(
+                HeaderScroll.Offset.X, DataScroll.Offset.Y);
+
         _vm.Rows.CollectionChanged += (_, _) => RebuildTable();
         _vm.PropertyChanged += (_, e) =>
         {
@@ -42,16 +49,9 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
         RebuildTable();
     }
 
-    private void HorizonSlider_PointerPressed(object? sender,
-        Avalonia.Input.PointerPressedEventArgs e)
-    {
-        _sliderDragging = true;
-    }
-
     private void HorizonSlider_PointerReleased(object? sender,
         Avalonia.Input.PointerReleasedEventArgs e)
     {
-        _sliderDragging = false;
         if (sender is Slider slider)
             _vm.HorizonMinutes = (int)Math.Round(slider.Value / 15) * 15;
     }

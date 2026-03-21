@@ -51,7 +51,6 @@
         IsSnapToTickEnabled="True"
         Width="150"
         VerticalAlignment="Center"
-        PointerPressed="HorizonSlider_PointerPressed"
         PointerReleased="HorizonSlider_PointerReleased"/>
 
 <TextBlock Text="{Binding #HorizonSlider.Value,
@@ -76,7 +75,7 @@
 
     <!-- Column headers — built in code-behind since dynamic -->
     <ScrollViewer Grid.Row="1"
-                  HorizontalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Hidden"
                   VerticalScrollBarVisibility="Disabled"
                   x:Name="HeaderScroll">
       <ItemsControl x:Name="HeaderRow"
