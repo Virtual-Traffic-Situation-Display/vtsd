@@ -86,7 +86,7 @@ public partial class FlightCountPanelWindow : BasePanelWindow
             Avalonia.Threading.Dispatcher.UIThread.Post(RebuildStack);
 
         scroll.Content = stack;
-        PanelContent.Content = scroll;
+        PanelBody = scroll;
     }
 
     private static Control BuildRow(string arr, string dep,

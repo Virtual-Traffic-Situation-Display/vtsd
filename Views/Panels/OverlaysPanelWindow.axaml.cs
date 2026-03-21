@@ -49,6 +49,6 @@ public partial class OverlaysPanelWindow : BasePanelWindow
             Margin = new Avalonia.Thickness(4)
         };
         stack.Children.Add(artccCheck);
-        PanelContent.Content = stack;
+        PanelBody = stack;
     }
 }

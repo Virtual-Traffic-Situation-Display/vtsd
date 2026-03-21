@@ -158,6 +158,6 @@ public partial class ColorPickerWindow : BasePanelWindow
         mainStack.Children.Add(colorView);
         mainStack.Children.Add(buttonRow);
 
-        PanelContent.Content = mainStack;
+        PanelBody = mainStack;
     }
 }
