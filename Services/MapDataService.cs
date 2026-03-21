@@ -423,28 +423,23 @@ public class MapDataService : IMapDataService
 
     private static LatLon? TryParseCoordWaypoint(string token)
     {
-        try
-        {
-            int nIdx = token.IndexOfAny(new[] { 'N', 'S' });
-            int ewIdx = token.IndexOfAny(new[] { 'E', 'W' });
-
-            if (nIdx <= 0 || ewIdx <= nIdx) return null;
-
-            double lat = double.Parse(token[..nIdx]);
-            double lon = double.Parse(token[(nIdx + 1)..ewIdx]);
-
-            if (token[nIdx] == 'S') lat = -lat;
-            if (token[ewIdx] == 'W') lon = -lon;
-
-            if (lat < -90 || lat > 90 || lon < -180 || lon > 180)
-                return null;
-
-            return new LatLon(lat, lon);
-        }
-        catch
-        {
+        int nIdx = token.IndexOfAny(new[] { 'N', 'S' });
+        int ewIdx = token.IndexOfAny(new[] { 'E', 'W' });
+    
+        if (nIdx <= 0 || ewIdx <= nIdx) return null;
+    
+        if (!double.TryParse(token[..nIdx], out double lat))
             return null;
-        }
+        if (!double.TryParse(token[(nIdx + 1)..ewIdx], out double lon))
+            return null;
+    
+        if (token[nIdx] == 'S') lat = -lat;
+        if (token[ewIdx] == 'W') lon = -lon;
+    
+        if (lat < -90 || lat > 90 || lon < -180 || lon > 180)
+            return null;
+    
+        return new LatLon(lat, lon);
     }
 
     public List<TraconBoundary> LoadTraconBoundaries()

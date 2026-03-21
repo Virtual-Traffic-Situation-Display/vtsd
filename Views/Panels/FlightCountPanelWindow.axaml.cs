@@ -3,6 +3,7 @@ using Avalonia.Media;
 using System.Linq;
 using vTFMS.ViewModels;
 using vTFMS.ViewModels.Panels;
+using System;
 
 namespace vTFMS.Views.Panels;
 
@@ -10,6 +11,12 @@ public partial class FlightCountPanelWindow : BasePanelWindow
 {
     private readonly FlightCountPanelViewModel _vm;
     private readonly TsdViewModel _tsdViewModel;
+
+    public FlightCountPanelWindow()
+    {
+        throw new InvalidOperationException(
+            "Use the constructor that takes TsdViewModel.");
+    }
 
     public FlightCountPanelWindow(TsdViewModel tsdViewModel)
     {
