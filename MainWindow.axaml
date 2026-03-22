@@ -139,7 +139,8 @@
 
       <!-- FEA/FCA -->
       <MenuItem Header="FEA/FCA" Foreground="{StaticResource ForegroundPrimaryBrush}"
-                FontFamily="Arial" FontSize="13">
+                FontFamily="Arial" FontSize="13"
+                IsEnabled="False">
         <MenuItem Header="Show/Hide FEA/FCAs"
                   FontFamily="Arial" FontSize="12"
                   IsEnabled="False"/>

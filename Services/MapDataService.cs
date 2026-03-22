@@ -17,6 +17,10 @@ public class MapDataService : IMapDataService
     private readonly Dictionary<string, Navaid> _navaids = new();
     private readonly Dictionary<string, Waypoint> _waypoints = new();
 
+    // Airways — loaded lazily on first request
+    private Dictionary<string, Airway>? _airways = null;
+    private readonly object _airwayLock = new();
+
     public MapDataService()
     {
         LoadAirports();
@@ -118,6 +122,263 @@ public class MapDataService : IMapDataService
             $"MapDataService: loaded {_waypoints.Count} waypoints");
     }
 
+    // -------------------------------------------------------------------------
+    // Airways — lazy loaded from disk on first request
+    // -------------------------------------------------------------------------
+
+    private Dictionary<string, Airway> EnsureAirwaysLoaded()
+    {
+        if (_airways != null) return _airways;
+
+        lock (_airwayLock)
+        {
+            if (_airways != null) return _airways;
+
+            var result = new Dictionary<string, Airway>(
+                StringComparer.OrdinalIgnoreCase);
+
+            var filePath = Path.Combine(
+                AppContext.BaseDirectory, "Data", "AWY_BASE.csv");
+
+            if (!File.Exists(filePath))
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    "MapDataService: AWY_BASE.csv not found");
+                _airways = result;
+                return _airways;
+            }
+
+            var lineCount = File.ReadLines(filePath).Count();
+            System.Diagnostics.Debug.WriteLine(
+                $"MapDataService: AWY_BASE.csv has {lineCount} lines");
+
+            foreach (var line in File.ReadLines(filePath).Skip(1))
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                var fields = SplitCsvLine(line);
+                if (fields.Length < 8) continue;
+
+                try
+                {
+                    var type = fields[2].Trim();       // J, V, Q, T, A etc.
+                    var id = fields[4].Trim();          // e.g. J146
+                    var waypointString = fields[7].Trim(); // space-separated waypoints
+
+                    if (string.IsNullOrWhiteSpace(id) ||
+                        string.IsNullOrWhiteSpace(waypointString))
+                        continue;
+
+                    var waypoints = waypointString
+                        .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                        .ToList();
+
+                    result[id.ToUpperInvariant()] = new Airway
+                    {
+                        Identifier = id,
+                        Type = type,
+                        WaypointNames = waypoints
+                    };
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"MapDataService: skipping airway row — {ex.Message}");
+                }
+            }
+
+            System.Diagnostics.Debug.WriteLine(
+                $"MapDataService: loaded {result.Count} airways");
+
+            System.Diagnostics.Debug.WriteLine(
+    $"MapDataService: loaded {result.Count} airways, " +
+    $"sample keys: {string.Join(", ", result.Keys.Take(5))}");
+
+            _airways = result;
+            return _airways;
+        }
+    }
+
+    public LatLon? ResolveWaypoint(string identifier)
+    {
+        var nav = FindNavaid(identifier);
+        if (nav != null) return new LatLon(nav.Lat, nav.Lon);
+
+        var wp = FindWaypoint(identifier);
+        if (wp != null) return new LatLon(wp.Lat, wp.Lon);
+
+        var apt = FindAirport(identifier);
+        if (apt != null) return new LatLon(apt.Lat, apt.Lon);
+
+        return null;
+    }
+
+    public Airway? GetAirway(string identifier)
+    {
+        var airways = EnsureAirwaysLoaded();
+
+        if (!airways.TryGetValue(identifier.ToUpperInvariant(),
+            out var airway))
+            return null;
+
+        // Resolve waypoints to lat/lon if not already done
+        if (!airway.IsResolved)
+        {
+            airway.ResolvedPoints = airway.WaypointNames
+                .Select(name => ResolveWaypoint(name))
+                .ToList();
+            airway.IsResolved = true;
+        }
+
+        return airway;
+    }
+
+    //public List<Airway> GetAllAirwaysByType(string type)
+    //{
+    //    var airways = EnsureAirwaysLoaded();
+
+    //    return airways.Values
+    //        .Where(a => a.Type.Equals(type,
+    //            StringComparison.OrdinalIgnoreCase))
+    //        .Select(a =>
+    //        {
+    //            // Ensure resolved
+    //            if (!a.IsResolved)
+    //            {
+    //                a.ResolvedPoints = a.WaypointNames
+    //                    .Select(name => ResolveWaypoint(name))
+    //                    .ToList();
+    //                a.IsResolved = true;
+    //            }
+    //            return a;
+    //        })
+    //        .ToList();
+    //}
+
+    // -------------------------------------------------------------------------
+    // Route resolution — now handles airways
+    // -------------------------------------------------------------------------
+
+    public List<LatLon> ResolveRoute(string departure,
+        string route, string arrival)
+    {
+        var result = new List<LatLon>();
+
+        var dep = FindAirport(departure);
+        if (dep != null)
+            result.Add(new LatLon(dep.Lat, dep.Lon));
+
+        var tokens = route
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .ToList();
+
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            var token = tokens[i];
+
+            if (token == "DCT") continue;
+
+            // Check if this token is an airway identifier
+            if (IsAirwayToken(token))
+            {
+                // Previous fix = entry point, next fix = exit point
+                string? entryName = i > 0 ? tokens[i - 1] : null;
+                string? exitName = i < tokens.Count - 1
+                    ? tokens[i + 1] : null;
+
+                if (entryName != null && exitName != null)
+                {
+                    var airwayPoints = ResolveAirwaySegment(
+                        token, entryName, exitName);
+                    result.AddRange(airwayPoints);
+                }
+                continue;
+            }
+
+            // Regular waypoint/fix/navaid/airport
+            var coord = TryParseCoordWaypoint(token);
+            if (coord != null) { result.Add(coord); continue; }
+
+            var airport = FindAirport(token);
+            if (airport != null)
+            {
+                result.Add(new LatLon(airport.Lat, airport.Lon));
+                continue;
+            }
+
+            var navaid = FindNavaid(token);
+            if (navaid != null)
+            {
+                result.Add(new LatLon(navaid.Lat, navaid.Lon));
+                continue;
+            }
+
+            var waypoint = FindWaypoint(token);
+            if (waypoint != null)
+                result.Add(new LatLon(waypoint.Lat, waypoint.Lon));
+        }
+
+        var arr = FindAirport(arrival);
+        if (arr != null)
+            result.Add(new LatLon(arr.Lat, arr.Lon));
+
+        return result;
+    }
+
+    private List<LatLon> ResolveAirwaySegment(
+        string airwayId, string entryName, string exitName)
+    {
+        var result = new List<LatLon>();
+
+        var airway = GetAirway(airwayId);
+        if (airway == null) return result;
+
+        var names = airway.WaypointNames;
+
+        // Find entry and exit indices (case-insensitive)
+        int entryIdx = names.FindIndex(n =>
+            n.Equals(entryName, StringComparison.OrdinalIgnoreCase));
+        int exitIdx = names.FindIndex(n =>
+            n.Equals(exitName, StringComparison.OrdinalIgnoreCase));
+
+        if (entryIdx < 0 || exitIdx < 0) return result;
+
+        // Determine direction
+        int step = entryIdx < exitIdx ? 1 : -1;
+
+        // Walk from entry+1 to exit (inclusive) — entry point already
+        // added by the previous token's resolution
+        for (int i = entryIdx + step;
+            step > 0 ? i <= exitIdx : i >= exitIdx;
+            i += step)
+        {
+            if (i < 0 || i >= airway.ResolvedPoints.Count) break;
+            var pt = airway.ResolvedPoints[i];
+            if (pt != null)
+                result.Add(pt);
+        }
+
+        return result;
+    }
+
+    private static bool IsAirwayToken(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return false;
+        if (token == "DCT") return false;
+
+        // Airway identifiers: letter(s) followed by digits
+        // e.g. J146, V23, Q1, T267, A216
+        int i = 0;
+        while (i < token.Length && char.IsLetter(token[i])) i++;
+        if (i == 0 || i >= token.Length) return false;
+        while (i < token.Length && char.IsDigit(token[i])) i++;
+        return i == token.Length;
+    }
+
+    // -------------------------------------------------------------------------
+    // Everything below unchanged from original
+    // -------------------------------------------------------------------------
+
     private static string? FindResource(string fileName)
     {
         return Assembly.GetManifestResourceNames()
@@ -189,11 +450,6 @@ public class MapDataService : IMapDataService
         return points;
     }
 
-    /// <summary>
-    /// Shared GeoJSON feature parser. Reads all features from a JSON document,
-    /// applies a filter, extracts a name, and returns StateBoundary objects
-    /// for each Polygon or MultiPolygon ring that passes the filter.
-    /// </summary>
     private static List<StateBoundary> ParseGeoJsonStateBoundaries(
         string resourceFileName,
         Func<JsonElement, bool> featureFilter,
@@ -288,7 +544,6 @@ public class MapDataService : IMapDataService
 
     public List<StateBoundary> LoadCountryBoundaries()
     {
-        // Canadian provinces
         var result = ParseGeoJsonStateBoundaries(
             "na-provinces.json",
             feature =>
@@ -306,7 +561,6 @@ public class MapDataService : IMapDataService
             },
             "Canada province");
 
-        // Caribbean and Mexico
         var caribbeanAndMexico = new HashSet<string>(
             StringComparer.OrdinalIgnoreCase)
         {
@@ -365,81 +619,6 @@ public class MapDataService : IMapDataService
     {
         _waypoints.TryGetValue(identifier.ToUpperInvariant(), out var waypoint);
         return waypoint;
-    }
-
-    public List<LatLon> ResolveRoute(string departure,
-        string route, string arrival)
-    {
-        var result = new List<LatLon>();
-
-        var dep = FindAirport(departure);
-        if (dep != null)
-            result.Add(new LatLon(dep.Lat, dep.Lon));
-
-        var tokens = route
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Where(t => !IsAirway(t))
-            .ToList();
-
-        foreach (var token in tokens)
-        {
-            var coord = TryParseCoordWaypoint(token);
-            if (coord != null) { result.Add(coord); continue; }
-
-            var airport = FindAirport(token);
-            if (airport != null)
-            {
-                result.Add(new LatLon(airport.Lat, airport.Lon));
-                continue;
-            }
-
-            var navaid = FindNavaid(token);
-            if (navaid != null)
-            {
-                result.Add(new LatLon(navaid.Lat, navaid.Lon));
-                continue;
-            }
-
-            var waypoint = FindWaypoint(token);
-            if (waypoint != null)
-                result.Add(new LatLon(waypoint.Lat, waypoint.Lon));
-        }
-
-        var arr = FindAirport(arrival);
-        if (arr != null)
-            result.Add(new LatLon(arr.Lat, arr.Lon));
-
-        return result;
-    }
-
-    private static bool IsAirway(string token)
-    {
-        if (string.IsNullOrWhiteSpace(token)) return true;
-        if (token == "DCT") return true;
-        return token.Length >= 2 &&
-               char.IsLetter(token[0]) &&
-               char.IsDigit(token[1]);
-    }
-
-    private static LatLon? TryParseCoordWaypoint(string token)
-    {
-        int nIdx = token.IndexOfAny(new[] { 'N', 'S' });
-        int ewIdx = token.IndexOfAny(new[] { 'E', 'W' });
-    
-        if (nIdx <= 0 || ewIdx <= nIdx) return null;
-    
-        if (!double.TryParse(token[..nIdx], out double lat))
-            return null;
-        if (!double.TryParse(token[(nIdx + 1)..ewIdx], out double lon))
-            return null;
-    
-        if (token[nIdx] == 'S') lat = -lat;
-        if (token[ewIdx] == 'W') lon = -lon;
-    
-        if (lat < -90 || lat > 90 || lon < -180 || lon > 180)
-            return null;
-    
-        return new LatLon(lat, lon);
     }
 
     public List<TraconBoundary> LoadTraconBoundaries()
@@ -623,11 +802,8 @@ public class MapDataService : IMapDataService
     public bool IsPointInArtcc(double lat, double lon,
                                ArtccBoundary artcc)
     {
-        // Fast bounding box pre-check
         if (!artcc.IsInBoundingBox(lat, lon))
             return false;
-
-        // Full ray casting check
         return IsPointInPolygon(lat, lon, artcc.Points);
     }
 
@@ -654,5 +830,26 @@ public class MapDataService : IMapDataService
         }
 
         return inside;
+    }
+
+    private static LatLon? TryParseCoordWaypoint(string token)
+    {
+        int nIdx = token.IndexOfAny(new[] { 'N', 'S' });
+        int ewIdx = token.IndexOfAny(new[] { 'E', 'W' });
+
+        if (nIdx <= 0 || ewIdx <= nIdx) return null;
+
+        if (!double.TryParse(token[..nIdx], out double lat))
+            return null;
+        if (!double.TryParse(token[(nIdx + 1)..ewIdx], out double lon))
+            return null;
+
+        if (token[nIdx] == 'S') lat = -lat;
+        if (token[ewIdx] == 'W') lon = -lon;
+
+        if (lat < -90 || lat > 90 || lon < -180 || lon > 180)
+            return null;
+
+        return new LatLon(lat, lon);
     }
 }

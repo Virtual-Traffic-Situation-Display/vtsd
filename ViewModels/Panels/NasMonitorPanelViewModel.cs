@@ -13,6 +13,7 @@ namespace vTFMS.ViewModels.Panels;
 public class NasMonitorCell
 {
     public int Count { get; set; } = -1; // -1 = disabled
+    public List<VatsimPilot> Pilots { get; set; } = new();
 }
 
 public class NasMonitorRow
@@ -67,8 +68,6 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
             ResetCells();
     }
 
-    // Manual property — logic only fires when explicitly set (on mouse release),
-    // not on every slider tick
     private int _horizonMinutes = 60;
     public int HorizonMinutes
     {
@@ -91,6 +90,10 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
     public ObservableCollection<NasMonitorRow> Rows { get; } = new();
     public List<string> TimeLabels { get; private set; } = new();
 
+    // Stores projected positions per pilot per time slot for detail lookup
+    // Key: (artccIndex, colIndex) → list of (pilot, projectedPos)
+    private Dictionary<(int, int), List<(VatsimPilot pilot, LatLon pos)>> _cellDetails = new();
+
     private readonly EventHandler _onPilotsRefreshed;
 
     public NasMonitorPanelViewModel(
@@ -101,7 +104,6 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
         _tsdViewModel = tsdViewModel;
         _mapDataService = mapDataService;
 
-        // Subscribe to VATSIM data refresh (not filtered pilots)
         _onPilotsRefreshed = (_, _) => { if (IsEnabled) _ = RecalculateAsync(); };
         _tsdViewModel.PilotsRefreshed += _onPilotsRefreshed;
 
@@ -114,15 +116,21 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
         _tsdViewModel.PilotsRefreshed -= _onPilotsRefreshed;
     }
 
+    public List<(VatsimPilot pilot, LatLon pos)> GetCellDetails(
+        int artccIndex, int colIndex)
+    {
+        if (_cellDetails.TryGetValue((artccIndex, colIndex), out var list))
+            return list;
+        return new();
+    }
+
     private void InitializeRows()
     {
         Rows.Clear();
+        _cellDetails.Clear();
         foreach (var artcc in _tsdViewModel.ArtccBoundaries)
         {
-            var row = new NasMonitorRow
-            {
-                CenterId = artcc.Identifier
-            };
+            var row = new NasMonitorRow { CenterId = artcc.Identifier };
             int colCount = GetColumnCount();
             for (int i = 0; i < colCount; i++)
                 row.Cells.Add(new NasMonitorCell { Count = -1 });
@@ -138,7 +146,7 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
         next = new DateTime(next.Year, next.Month, next.Day,
             next.Hour, (next.Minute / 15) * 15, 0);
 
-        int count = 1; // Now
+        int count = 1;
         var t = next;
         while ((t - now).TotalMinutes < HorizonMinutes)
         {
@@ -151,11 +159,9 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
     private void BuildTimeLabels()
     {
         var now = DateTime.UtcNow;
-
         TimeLabels = new List<string> { $"{now:HHmm}" };
 
         int minutesToNext = now.Minute % 15 == 0 ? 15 : 15 - (now.Minute % 15);
-
         var next = now.AddMinutes(minutesToNext);
         next = new DateTime(next.Year, next.Month, next.Day,
             next.Hour, (next.Minute / 15) * 15, 0);
@@ -180,7 +186,11 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
     {
         foreach (var row in Rows)
             foreach (var cell in row.Cells)
+            {
                 cell.Count = -1;
+                cell.Pilots.Clear();
+            }
+        _cellDetails.Clear();
         OnPropertyChanged(nameof(Rows));
     }
 
@@ -188,24 +198,19 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
     {
         if (!IsEnabled) return;
 
-        // Always rebuild time labels so "Now" stays current
         BuildTimeLabels();
 
-        // Rebuild rows only if column count changed
         var newColCount = GetColumnCount();
         if (newColCount != Rows.FirstOrDefault()?.Cells.Count)
             InitializeRows();
 
-        // Snapshot — VatsimService can replace CurrentPilots on another thread
         var pilots = _tsdViewModel.AllCurrentPilots.ToList();
-
         await _tsdViewModel.ResolveAllRoutesAsync(pilots);
 
         var artccList = _tsdViewModel.ArtccBoundaries.ToList();
 
         var now = DateTime.UtcNow;
         int minutesToNext = now.Minute % 15 == 0 ? 15 : 15 - (now.Minute % 15);
-
         var next = now.AddMinutes(minutesToNext);
         next = new DateTime(next.Year, next.Month, next.Day,
             next.Hour, (next.Minute / 15) * 15, 0);
@@ -221,9 +226,11 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
         int colCount = timeSlots.Count;
         int[] minutes = timeSlots.ToArray();
 
-        var counts = await Task.Run(() =>
+        var (counts, details) = await Task.Run(() =>
         {
             var result = new int[artccList.Count, colCount];
+            var detailMap = new Dictionary<(int, int),
+                List<(VatsimPilot, LatLon)>>();
 
             foreach (var pilot in pilots)
             {
@@ -248,6 +255,10 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
                                 pos.Lat, pos.Lon, artccList[a]))
                             {
                                 result[a, col]++;
+                                var key = (a, col);
+                                if (!detailMap.ContainsKey(key))
+                                    detailMap[key] = new();
+                                detailMap[key].Add((pilot, pos));
                             }
                         }
                     }
@@ -260,7 +271,7 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
                 }
             }
 
-            return result;
+            return (result, detailMap);
         });
 
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
@@ -271,9 +282,12 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
                 BuildTimeLabels();
             }
 
+            _cellDetails = details;
+
             for (int a = 0; a < Rows.Count && a < artccList.Count; a++)
             {
-                for (int col = 0; col < colCount && col < Rows[a].Cells.Count; col++)
+                for (int col = 0; col < colCount &&
+                    col < Rows[a].Cells.Count; col++)
                 {
                     Rows[a].Cells[col].Count = counts[a, col];
                 }
@@ -328,15 +342,11 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
     {
         var settings = new NasMonitorSettings
         {
-            HorizonMinutes = HorizonMinutes,
             Thresholds = _thresholds.Values.ToList()
         };
 
         var json = System.Text.Json.JsonSerializer.Serialize(settings,
-            new System.Text.Json.JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
 
         System.IO.File.WriteAllText(path, json);
     }
@@ -368,8 +378,7 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
 
         if (files.Count > 0)
         {
-            var json = System.IO.File.ReadAllText(
-                files[0].Path.LocalPath);
+            var json = System.IO.File.ReadAllText(files[0].Path.LocalPath);
             var settings = System.Text.Json.JsonSerializer
                 .Deserialize<NasMonitorSettings>(json);
 
@@ -377,7 +386,6 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
             {
                 _thresholds = settings.Thresholds
                     .ToDictionary(t => t.Identifier);
-                HorizonMinutes = settings.HorizonMinutes;
                 OnPropertyChanged(nameof(Rows));
             }
         }

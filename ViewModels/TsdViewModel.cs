@@ -79,8 +79,40 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _showFlightCount = false;
 
+    // Cached airway lists — populated on first request
+    //private List<Airway>? _jetRoutes;
+    //private List<Airway>? _victorRoutes;
+
+    //public List<Airway> JetRoutes
+    //{
+    //    get
+    //    {
+    //        if (_jetRoutes == null)
+    //        {
+    //            _jetRoutes = _mapDataService.GetAllAirwaysByType("J");
+    //            // Also include Q routes (high altitude RNAV)
+    //            _jetRoutes.AddRange(_mapDataService.GetAllAirwaysByType("Q"));
+    //        }
+    //        return _jetRoutes;
+    //    }
+    //}
+
+    //public List<Airway> VictorRoutes
+    //{
+    //    get
+    //    {
+    //        if (_victorRoutes == null)
+    //        {
+    //            _victorRoutes = _mapDataService.GetAllAirwaysByType("V");
+    //            // Also include T routes (low altitude RNAV)
+    //            _victorRoutes.AddRange(_mapDataService.GetAllAirwaysByType("T"));
+    //        }
+    //        return _victorRoutes;
+    //    }
+    //}
+
     public List<VatsimPilot> AllCurrentPilots =>
-    _vatsimService.CurrentPilots;
+        _vatsimService.CurrentPilots;
 
     /// <summary>Raised after every VATSIM data refresh, before filtering.</summary>
     public event EventHandler? PilotsRefreshed;
@@ -91,7 +123,6 @@ public partial class TsdViewModel : ObservableObject, IDisposable
 
     public void ApplyDisplaySettings()
     {
-        // Notify TsdRadarControl to redraw with new colors
         OnPropertyChanged(nameof(DisplaySettings));
     }
 
@@ -102,7 +133,6 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     {
         if (!ShowWeather) return;
 
-        // Store bounds before fetching
         RadarMinLat = minLat;
         RadarMinLon = minLon;
         RadarMaxLat = maxLat;
@@ -113,8 +143,7 @@ public partial class TsdViewModel : ObservableObject, IDisposable
         RadarImageData = data;
     }
 
-    public async Task ResolveAllRoutesAsync(
-    List<VatsimPilot> pilots)
+    public async Task ResolveAllRoutesAsync(List<VatsimPilot> pilots)
     {
         await Task.Run(() =>
         {
@@ -324,6 +353,36 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                 }
             }
 
+            if (item == null)
+            {
+                var airway = _mapDataService.GetAirway(id);
+                System.Diagnostics.Debug.WriteLine(
+        $"TryAddMapItems: airway lookup for '{id}' = " +
+        $"{(airway == null ? "null" : $"{airway.Identifier} ({airway.WaypointNames.Count} waypoints)")}");
+                if (airway != null && airway.ResolvedPoints.Count > 0)
+                {
+                    var points = airway.ResolvedPoints
+                        .Where(p => p != null)
+                        .Select(p => p!)
+                        .ToList();
+
+                    if (points.Count > 0)
+                    {
+                        double avgLat = points.Average(p => p.Lat);
+                        double avgLon = points.Average(p => p.Lon);
+
+                        item = new MapItem
+                        {
+                            Identifier = id,
+                            Type = "Airway",
+                            Lat = avgLat,
+                            Lon = avgLon,
+                            Rings = new List<List<LatLon>> { points }
+                        };
+                    }
+                }
+            }
+
             if (item != null)
             {
                 _navDataCache[id] = item;
@@ -364,7 +423,6 @@ public partial class TsdViewModel : ObservableObject, IDisposable
 
     private void RefreshVisiblePilots(List<VatsimPilot> pilots)
     {
-        // Do all the heavy work off the UI thread
         Task.Run(() =>
         {
             var activeFilters = _flightFilters
@@ -417,7 +475,6 @@ public partial class TsdViewModel : ObservableObject, IDisposable
 
                 if (matches)
                 {
-                    // Resolve route off UI thread
                     if (pilot.MatchedDrawRoute &&
                         pilot.ParsedRoute.Count == 0 &&
                         !string.IsNullOrWhiteSpace(pilot.Route))
@@ -431,7 +488,6 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                 }
             }
 
-            // Only touch the UI collection on the UI thread
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 VisiblePilots.Clear();
