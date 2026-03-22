@@ -156,7 +156,16 @@
                   FontFamily="Arial" FontSize="12"
                   IsEnabled="False"/>
       </MenuItem>
+
+      <MenuItem Header="Help" Foreground="{StaticResource ForegroundPrimaryBrush}"
+          FontFamily="Arial" FontSize="13">
+        <MenuItem Header="About..."
+            FontFamily="Arial" FontSize="12"
+            Command="{Binding OpenAboutCommand}"/>
+      </MenuItem>
     </Menu>
+
+    
 
     <!-- TSD fills the main window -->
     <views:TsdView Grid.Row="1"
@@ -175,6 +184,14 @@
                VerticalAlignment="Center"
                IsVisible="{Binding VatsimConnected}"
                ToolTip.Tip="VATSIM data active"/>
+
+        <TextBlock Grid.Column="1"
+           Text="{Binding AppVersion, StringFormat='v{0}'}"
+           Foreground="{StaticResource ForegroundPrimaryBrush}"
+           FontFamily="Arial"
+           FontSize="10"
+           HorizontalAlignment="Center"
+           VerticalAlignment="Center"/>
 
         <TextBlock Grid.Column="2"
                    Text="{Binding CurrentTime}"
