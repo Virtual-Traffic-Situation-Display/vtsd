@@ -21,6 +21,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly IProfileService _profileService;
     private readonly IWeatherService _weatherService;
     private readonly IMapDataService _mapDataService;
+    private readonly IFontService _fontService;
     private readonly Window _mainWindow;
 
 
@@ -72,11 +73,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
                          IVatsimService vatsimService,
                          IProfileService profileService,
                          IWeatherService weatherService,
+                         IFontService fontService,
                          Window mainWindow)
     {
         _panelManager = panelManager;
         _profileService = profileService;
         _weatherService = weatherService;
+        _fontService = fontService;
         _mapDataService = mapDataService;
         _mainWindow = mainWindow;
         TsdViewModel = new TsdViewModel(mapDataService, vatsimService, weatherService);
@@ -144,7 +147,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void OpenAdapt() =>
     _panelManager.OpenWithArgs(
-        new AdaptPanelWindow(TsdViewModel));
+        new AdaptPanelWindow(TsdViewModel, _fontService));
 
     [RelayCommand]
     private void OpenNasMonitor() =>
