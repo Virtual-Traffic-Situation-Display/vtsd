@@ -239,12 +239,6 @@
       <Button Content="OK" Command="{Binding OkCommand}"
               FontFamily="Arial" FontSize="11"
               MinWidth="60" Margin="4"/>
-      <Button Content="Apply" Command="{Binding ApplyCommand}"
-              FontFamily="Arial" FontSize="11"
-              MinWidth="60" Margin="4"/>
-      <Button Content="Undo" Command="{Binding UndoCommand}"
-              FontFamily="Arial" FontSize="11"
-              MinWidth="60" Margin="4"/>
       <Button Content="Cancel" Command="{Binding CancelCommand}"
               FontFamily="Arial" FontSize="11"
               MinWidth="60" Margin="4"/>
