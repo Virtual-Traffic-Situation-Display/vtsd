@@ -120,6 +120,11 @@
                     Command="{Binding ToggleVatsimDataCommand}"
                     Icon="{Binding VatsimDataEnabled,
                            Converter={StaticResource BoolToCheckConverter}}"/>
+          <MenuItem Header="Display All Aircraft"
+                    FontFamily="Arial" FontSize="12"
+                    Command="{Binding ToggleShowAllAircraftCommand}"
+                    Icon="{Binding ShowAllAircraft,
+                           Converter={StaticResource BoolToCheckConverter}}"/>
           <MenuItem Header="Select Flights..."
                     FontFamily="Arial" FontSize="12"
                     Command="{Binding OpenSelectFlightsCommand}"/>

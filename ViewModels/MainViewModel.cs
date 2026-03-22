@@ -48,6 +48,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
+    private void ToggleShowAllAircraft()
+    {
+        TsdViewModel.ShowAllAircraft = !TsdViewModel.ShowAllAircraft;
+        OnPropertyChanged(nameof(ShowAllAircraft));
+    }
+
+public bool ShowAllAircraft => TsdViewModel.ShowAllAircraft;
+
+    [RelayCommand]
     private void ToggleVatsimData()
     {
         TsdViewModel.VatsimDataEnabled = !TsdViewModel.VatsimDataEnabled;
@@ -95,6 +104,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 OnPropertyChanged(nameof(VatsimConnected));
             if (e.PropertyName == nameof(TsdViewModel.VatsimDataEnabled))
                 OnPropertyChanged(nameof(VatsimDataEnabled));
+            if (e.PropertyName == nameof(TsdViewModel.ShowAllAircraft))
+                OnPropertyChanged(nameof(ShowAllAircraft));
         };
     }
 

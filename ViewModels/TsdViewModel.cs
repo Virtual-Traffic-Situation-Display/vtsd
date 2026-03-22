@@ -35,6 +35,14 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     private bool _showAirports = false;
 
     [ObservableProperty]
+    private bool _showAllAircraft = false;
+
+    partial void OnShowAllAircraftChanged(bool value)
+    {
+        RefreshVisiblePilots(_vatsimService.CurrentPilots);
+    }
+
+    [ObservableProperty]
     private bool _showWaypoints = false;
 
     [ObservableProperty]
@@ -452,21 +460,21 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                     (!string.IsNullOrWhiteSpace(f.Arrival) ||
                      !string.IsNullOrWhiteSpace(f.Departure)))
                 .ToList();
-
-            if (!activeFilters.Any())
+    
+            if (!ShowAllAircraft && !activeFilters.Any())
             {
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                     VisiblePilots.Clear());
                 return;
             }
-
+    
             var matched = new List<VatsimPilot>();
-
+    
             foreach (var pilot in pilots)
             {
                 if (!IsInMapView(pilot.Lat, pilot.Lon)) continue;
-
-                bool matches = false;
+    
+                bool matchedFilter = false;
                 foreach (var filter in activeFilters)
                 {
                     bool arrivalMatch =
@@ -476,7 +484,7 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                             .Any(a => pilot.Arrival.Contains(
                                 a.ToUpperInvariant(),
                                 StringComparison.OrdinalIgnoreCase));
-
+    
                     bool departureMatch =
                         string.IsNullOrWhiteSpace(filter.Departure) ||
                         filter.Departure
@@ -484,32 +492,38 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                             .Any(d => pilot.Departure.Contains(
                                 d.ToUpperInvariant(),
                                 StringComparison.OrdinalIgnoreCase));
-
+    
                     if (arrivalMatch && departureMatch)
                     {
-                        matches = true;
+                        matchedFilter = true;
                         pilot.MatchedFilterColor = filter.Color;
                         pilot.MatchedDrawRoute = filter.DrawRoute;
                         pilot.MatchedShowRoute = filter.ShowRoute;
                         break;
                     }
                 }
-
-                if (matches)
+    
+                if (matchedFilter)
                 {
                     if (pilot.MatchedDrawRoute &&
                         pilot.ParsedRoute.Count == 0 &&
                         !string.IsNullOrWhiteSpace(pilot.Route))
                     {
                         pilot.ParsedRoute = _mapDataService.ResolveRoute(
-                            pilot.Departure,
-                            pilot.Route,
-                            pilot.Arrival);
+                            pilot.Departure, pilot.Route, pilot.Arrival);
                     }
                     matched.Add(pilot);
                 }
+                else if (ShowAllAircraft)
+                {
+                    // Unfiltered aircraft get default appearance
+                    pilot.MatchedFilterColor = "#FFFFFF";
+                    pilot.MatchedDrawRoute = false;
+                    pilot.MatchedShowRoute = false;
+                    matched.Add(pilot);
+                }
             }
-
+    
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 VisiblePilots.Clear();
@@ -518,7 +532,6 @@ public partial class TsdViewModel : ObservableObject, IDisposable
             });
         });
     }
-
     private void OnRadarUpdated(object? sender, byte[]? data)
     {
         if (data == null) return;
