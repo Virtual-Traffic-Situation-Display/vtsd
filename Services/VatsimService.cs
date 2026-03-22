@@ -38,9 +38,11 @@ public class VatsimService : IVatsimService, IDisposable
 
     public event EventHandler<List<VatsimPilot>>? PilotsUpdated;
     public List<VatsimPilot> CurrentPilots { get; private set; } = new();
+    public bool IsRunning { get; private set; }
 
     public void Start()
     {
+        IsRunning = true;
         _cts = new CancellationTokenSource();
 
         // Fetch immediately
@@ -57,6 +59,7 @@ public class VatsimService : IVatsimService, IDisposable
 
     public void Stop()
     {
+        IsRunning = false;
         _cts.Cancel();
         _timer?.Dispose();
         _timer = null;

@@ -73,6 +73,29 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _vatsimConnected = false;
 
+    private bool _vatsimDataEnabled;
+    public bool VatsimDataEnabled
+    {
+        get => _vatsimDataEnabled;
+        set
+        {
+            if (SetProperty(ref _vatsimDataEnabled, value))
+            {
+                if (value)
+                {
+                    _vatsimService.Start();
+                }
+                else
+                {
+                    _vatsimService.Stop();
+                    VatsimConnected = false;
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        VisiblePilots.Clear());
+                }
+            }
+        }
+    }
+
     [ObservableProperty]
     private bool _showArtcc = false;
 
@@ -179,7 +202,6 @@ public partial class TsdViewModel : ObservableObject, IDisposable
         SelectFlightsViewModel = new SelectFlightsPanelViewModel(this);
 
         _vatsimService.PilotsUpdated += OnPilotsUpdated;
-        _vatsimService.Start();
 
         _weatherService.AutoRefreshTriggered += OnAutoRefreshTriggered;
 

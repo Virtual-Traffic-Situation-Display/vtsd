@@ -20,6 +20,9 @@
             <converters:PinIconConverter x:Key="PinIconConverter"/>
             <converters:HexToBrushConverter x:Key="HexToBrushConverter"/>
             <converters:HexToContrastBrushConverter x:Key="HexToContrastBrushConverter"/>
+            <converters:BoolToCheckConverter x:Key="BoolToCheckConverter"/>
+            <converters:BoolToOpacityConverter x:Key="BoolToOpacityConverter"/>
+            <converters:BoolToVatsimTipConverter x:Key="BoolToVatsimTipConverter"/>
             <Color x:Key="PanelBackground">#ffe4c4</Color>
             <Color x:Key="PanelBorder">#ede9e3</Color>
             <Color x:Key="TitleBarBackground">#e1ddd8</Color>
