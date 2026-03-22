@@ -12,8 +12,8 @@
 
     <!-- Column headers -->
     <Grid Grid.Row="0"
-          ColumnDefinitions="30,50,60,80,80,70,60,70,70"
-          Margin="4,4,4,0">
+        ColumnDefinitions="30,50,60,80,80,70,60,70,70,30"
+        Margin="4,4,4,0">
       <TextBlock Grid.Column="0" Text=""
                  FontFamily="Arial" FontSize="11" FontWeight="Bold"
                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -48,7 +48,7 @@
       <ItemsControl ItemsSource="{Binding Filters}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="models:FlightFilter">
-            <Grid ColumnDefinitions="30,50,60,80,80,70,60,70,70"
+            <Grid ColumnDefinitions="30,50,60,80,80,70,60,70,70,30"
                   Margin="4,2,4,2">
 
               <TextBlock Grid.Column="0"
@@ -100,6 +100,14 @@
                         IsChecked="{Binding Filter}"
                         HorizontalAlignment="Center"/>
 
+              <Button Grid.Column="9"
+                      Content="✕"
+                      FontFamily="Arial" FontSize="9"
+                      Padding="4,1"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center"
+                      Command="{Binding $parent[ItemsControl].((vm:SelectFlightsPanelViewModel)DataContext).RemoveRowCommand}"
+                      CommandParameter="{Binding}"/>
             </Grid>
           </DataTemplate>
         </ItemsControl.ItemTemplate>

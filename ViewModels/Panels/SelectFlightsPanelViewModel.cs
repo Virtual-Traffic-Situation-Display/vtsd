@@ -35,6 +35,15 @@ public partial class SelectFlightsPanelViewModel : BasePanelViewModel
     }
 
     [RelayCommand]
+    private void RemoveRow(FlightFilter filter)
+    {
+        Filters.Remove(filter);
+        // Renumber remaining rows
+        for (int i = 0; i < Filters.Count; i++)
+            Filters[i].RowNumber = i + 1;
+    }
+
+    [RelayCommand]
     private void Apply()
     {
         _tsdViewModel.SetFlightFilters(Filters.ToList());
