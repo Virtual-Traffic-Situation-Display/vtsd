@@ -27,5 +27,6 @@
     RadarMaxLon="{Binding RadarMaxLon}"
     DisplaySettings="{Binding DisplaySettings}"
     ArtccBoundaries="{Binding ArtccBoundaries}"
-    ShowArtcc="{Binding ShowArtcc, Mode=TwoWay}"/>
+    ShowArtcc="{Binding ShowArtcc, Mode=TwoWay}"
+    RangeRings="{Binding RangeRings}"/>
 </UserControl>

@@ -2,6 +2,102 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:panels="using:vTFMS.Views.Panels"
+    xmlns:vm="using:vTFMS.ViewModels.Panels"
+    xmlns:models="using:vTFMS.Models"
     x:Class="vTFMS.Views.Panels.RangeRingsPanelWindow"
-    Width="320" Height="240">
+    x:DataType="vm:RangeRingsPanelViewModel"
+    Width="380" Height="340"
+    RequestedThemeVariant="Light">
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Margin="8">
+
+    <!-- Input fields -->
+    <Grid Grid.Row="0" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto"
+          Margin="0,0,0,8">
+
+      <TextBlock Grid.Row="0" Grid.Column="0"
+                 Text="Center:"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center" Margin="0,0,8,4"/>
+      <TextBox Grid.Row="0" Grid.Column="1"
+               Text="{Binding CenterIdentifier}"
+               FontFamily="Arial" FontSize="11"
+               Height="26" Margin="0,0,0,4"/>
+
+      <TextBlock Grid.Row="1" Grid.Column="0"
+                 Text="Interval (NM):"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center" Margin="0,0,8,4"/>
+      <TextBox Grid.Row="1" Grid.Column="1"
+               Text="{Binding IntervalNm}"
+               FontFamily="Arial" FontSize="11"
+               Height="26" Margin="0,0,0,4"/>
+
+      <TextBlock Grid.Row="2" Grid.Column="0"
+                 Text="Distance (NM):"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center" Margin="0,0,8,0"/>
+      <TextBox Grid.Row="2" Grid.Column="1"
+               Text="{Binding DistanceNm}"
+               FontFamily="Arial" FontSize="11"
+               Height="26"/>
+    </Grid>
+
+    <!-- Add button -->
+    <Button Grid.Row="1"
+            Content="Add Range Rings"
+            Command="{Binding AddCommand}"
+            FontFamily="Arial" FontSize="11"
+            HorizontalAlignment="Stretch"
+            Margin="0,0,0,8"/>
+
+    <!-- Active rings list -->
+    <Border Grid.Row="2"
+            BorderBrush="#aaaaaa" BorderThickness="1"
+            CornerRadius="2" Margin="0,0,0,4">
+      <ScrollViewer>
+        <ItemsControl ItemsSource="{Binding ActiveRings}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="models:RangeRingConfig">
+              <Grid ColumnDefinitions="*,Auto" Margin="4,2">
+                <TextBlock Grid.Column="0"
+                           FontFamily="Arial" FontSize="11"
+                           VerticalAlignment="Center">
+                  <TextBlock.Text>
+                    <MultiBinding StringFormat="{}{0}  {1}NM / {2}NM">
+                      <Binding Path="Identifier"/>
+                      <Binding Path="IntervalNm"/>
+                      <Binding Path="DistanceNm"/>
+                    </MultiBinding>
+                  </TextBlock.Text>
+                </TextBlock>
+                <Button Grid.Column="1"
+                        Content="✕"
+                        FontFamily="Arial" FontSize="9"
+                        Padding="4,1"
+                        VerticalAlignment="Center"
+                        Command="{Binding $parent[ItemsControl].((vm:RangeRingsPanelViewModel)DataContext).RemoveCommand}"
+                        CommandParameter="{Binding}"/>
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+
+    <!-- Status message -->
+    <TextBlock Grid.Row="3"
+               Text="{Binding StatusMessage}"
+               FontFamily="Arial" FontSize="10"
+               Margin="0,0,0,4"/>
+
+    <!-- Bottom button -->
+    <Button Grid.Row="4"
+            Content="Clear All"
+            Command="{Binding ClearAllCommand}"
+            FontFamily="Arial" FontSize="11"
+            HorizontalAlignment="Right"/>
+
+  </Grid>
+
 </panels:BasePanelWindow>
