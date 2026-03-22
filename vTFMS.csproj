@@ -15,6 +15,7 @@
   <ItemGroup>
 	  <None Remove="Data\APT_BASE.csv" />
 	  <None Remove="Data\ARB_SEG.csv" />
+	  <None Remove="Data\AWY_BASE.csv" />
 	  <None Remove="Data\FIX_BASE.csv" />
 	  <None Remove="Data\na-countries.json" />
 	  <None Remove="Data\na-provinces.json" />
@@ -26,6 +27,9 @@
   <ItemGroup>
     <EmbeddedResource Include="Data\APT_BASE.csv" />
     <EmbeddedResource Include="Data\ARB_SEG.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Data\AWY_BASE.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </EmbeddedResource>
     <EmbeddedResource Include="Data\FIX_BASE.csv" />

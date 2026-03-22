@@ -13,11 +13,14 @@ public interface IMapDataService
     List<TraconBoundary> LoadTraconBoundaries();
     List<ArtccBoundary> LoadArtccBoundaries();
     List<LatLon> ResolveRoute(string departure, string route,
-                           string arrival);
-
+                              string arrival);
     bool IsPointInPolygon(double lat, double lon,
                           List<LatLon> polygon);
-
     bool IsPointInArtcc(double lat, double lon,
                         ArtccBoundary artcc);
+
+    // Airways — lazy loaded on first request
+    Airway? GetAirway(string identifier);
+    //List<Airway> GetAllAirwaysByType(string type);
+    LatLon? ResolveWaypoint(string identifier);
 }

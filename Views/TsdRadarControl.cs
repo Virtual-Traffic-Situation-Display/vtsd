@@ -40,6 +40,8 @@ public class TsdRadarControl : Control
     private Pen _boundaryPen = new(new SolidColorBrush(Colors.White), 0.8);
     private Pen _sectorPen = new(new SolidColorBrush(Colors.Gray), 1.0);
     private Pen _artccPen = new(new SolidColorBrush(Colors.Red), 1.5);
+    private Pen _jetRoutePen = new(new SolidColorBrush(Colors.Cyan), 0.8);
+    private Pen _victorRoutePen = new(new SolidColorBrush(Colors.Green), 0.8);
     private SolidColorBrush _airportBrush = new(Colors.Cyan);
     private Pen _vorPen = new(new SolidColorBrush(Colors.Orange), 1.0);
     private SolidColorBrush _vorBrush = new(Colors.Orange);
@@ -601,6 +603,10 @@ public class TsdRadarControl : Control
             new SolidColorBrush(Color.Parse(s.TraconColor)), 1.0);
         _artccPen = new Pen(
             new SolidColorBrush(Color.Parse(s.ArtccColor)), 1.5);
+        _jetRoutePen = new Pen(
+            new SolidColorBrush(Color.Parse(s.JetRoutesColor)), 0.8);
+        _victorRoutePen = new Pen(
+            new SolidColorBrush(Color.Parse(s.VictorRoutesColor)), 0.8);
         _airportBrush = new SolidColorBrush(Color.Parse(s.AirportColor));
         _vorBrush = new SolidColorBrush(Color.Parse(s.VorColor));
         _vorPen = new Pen(_vorBrush, 1.0);
@@ -622,11 +628,9 @@ public class TsdRadarControl : Control
         var height = Bounds.Height;
         if (width <= 0 || height <= 0) return;
 
-        // Background
         context.FillRectangle(
             _backgroundBrush, new Rect(0, 0, width, height));
 
-        // Rebuild geometries if dirty or size changed
         if (_geometriesDirty ||
             Math.Abs(_cachedWidth - width) > 0.5 ||
             Math.Abs(_cachedHeight - height) > 0.5)
@@ -634,21 +638,17 @@ public class TsdRadarControl : Control
             RebuildGeometries(width, height);
         }
 
-        // State boundaries
         if (ShowStateBoundaries && _stateBoundaryGeometry != null)
             context.DrawGeometry(
                 null, _boundaryPen, _stateBoundaryGeometry);
 
-        // Country boundaries
         if (ShowCountryBoundaries && _countryBoundaryGeometry != null)
             context.DrawGeometry(
                 null, _boundaryPen, _countryBoundaryGeometry);
 
-        // Sector boundaries
         if (_sectorGeometry != null)
             context.DrawGeometry(null, _sectorPen, _sectorGeometry);
 
-        // Radar overlay
         if (ShowWeather && _radarBitmap != null)
         {
             var topLeft = LatLonToScreen(
@@ -671,17 +671,11 @@ public class TsdRadarControl : Control
             }
         }
 
-        // ARTCC boundaries — drawn after radar so they appear on top
         if (ShowArtcc && _artccBoundaryGeometry != null)
             context.DrawGeometry(null, _artccPen, _artccBoundaryGeometry);
 
-        // Routes — drawn before aircraft so aircraft appear on top
         DrawRoutes(context, width, height);
-
-        // Map items
         DrawActiveMapItems(context, width, height);
-
-        // Aircraft
         DrawAircraft(context, width, height);
     }
 
@@ -938,7 +932,8 @@ public class TsdRadarControl : Control
         foreach (var pilot in VisiblePilots)
         {
             if (!pilot.MatchedDrawRoute) continue;
-            if (pilot.ParsedRoute is null || pilot.ParsedRoute.Count < 2) continue;
+            if (pilot.ParsedRoute is null ||
+                pilot.ParsedRoute.Count < 2) continue;
 
             var brush = new SolidColorBrush(
                 Color.Parse(pilot.MatchedFilterColor));
@@ -1002,7 +997,7 @@ public class TsdRadarControl : Control
         foreach (var item in ActiveMapItems)
         {
             var pt = LatLonToScreen(item.Lat, item.Lon, width, height);
-            if (!IsOnScreen(pt, width, height)) continue;
+            if (item.Type != "Airway" && !IsOnScreen(pt, width, height)) continue;
 
             switch (item.Type)
             {
@@ -1088,6 +1083,57 @@ public class TsdRadarControl : Control
 
                 case "TRACON":
                     DrawTraconBoundary(context, item, width, height);
+                    break;
+
+                case "Airway":
+                    if (item.Rings.Count > 0)
+                    {
+                        var airwayGeo = new StreamGeometry();
+                        using (var ctx = airwayGeo.Open())
+                        {
+                            var ring = item.Rings[0];
+                            if (ring.Count > 0)
+                            {
+                                var first = LatLonToScreen(
+                                    ring[0].Lat, ring[0].Lon,
+                                    width, height);
+                                ctx.BeginFigure(first, false);
+                                for (int i = 1; i < ring.Count; i++)
+                                {
+                                    ctx.LineTo(LatLonToScreen(
+                                        ring[i].Lat, ring[i].Lon,
+                                        width, height));
+                                }
+                                ctx.EndFigure(false);
+                            }
+                        }
+
+                        var airwayPen =
+                            item.Identifier.StartsWith("V",
+                                StringComparison.OrdinalIgnoreCase) ||
+                            item.Identifier.StartsWith("T",
+                                StringComparison.OrdinalIgnoreCase)
+                            ? _victorRoutePen : _jetRoutePen;
+
+                        context.DrawGeometry(null, airwayPen, airwayGeo);
+
+                        var midPt = item.Rings[0][item.Rings[0].Count / 2];
+                        var midScreen = LatLonToScreen(
+                            midPt.Lat, midPt.Lon, width, height);
+
+                        if (IsOnScreen(midScreen, width, height))
+                        {
+                            var airwayLabel = new FormattedText(
+                                item.Identifier,
+                                System.Globalization.CultureInfo.CurrentCulture,
+                                FlowDirection.LeftToRight,
+                                _mapLabelTypeface, 9, _mapLabelBrush);
+
+                            context.DrawText(airwayLabel, new Point(
+                                midScreen.X - airwayLabel.Width / 2,
+                                midScreen.Y - airwayLabel.Height / 2));
+                        }
+                    }
                     break;
             }
         }

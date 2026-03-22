@@ -16,11 +16,10 @@ public partial class OverlaysPanelWindow : BasePanelWindow
         throw new InvalidOperationException(
             "Use the constructor that takes a TsdViewModel.");
     }
-    
+
     public OverlaysPanelWindow(TsdViewModel tsdViewModel)
     {
         _tsdViewModel = tsdViewModel;
-        
 
         var vm = new BasePanelViewModel { Title = "OVERLAYS" };
         DataContext = vm;
@@ -30,25 +29,36 @@ public partial class OverlaysPanelWindow : BasePanelWindow
 
     private void BuildContent()
     {
-        var artccCheck = new CheckBox
+        var stack = new StackPanel
         {
-            Content = "Show ARTCC Boundaries",
+            Margin = new Avalonia.Thickness(4)
+        };
+
+        stack.Children.Add(MakeCheckBox("Show ARTCC Boundaries", "ShowArtcc"));
+        //stack.Children.Add(MakeCheckBox("Show Jet Routes (J/Q)", "ShowJetRoutes"));
+        //stack.Children.Add(MakeCheckBox("Show Victor Routes (V/T)", "ShowVictorRoutes"));
+        //stack.Children.Add(MakeCheckBox("Show Airway Labels", "ShowAirwayLabels"));
+
+        PanelBody = stack;
+    }
+
+    private CheckBox MakeCheckBox(string label, string bindingPath)
+    {
+        var cb = new CheckBox
+        {
+            Content = label,
             FontFamily = new FontFamily("Arial"),
             FontSize = 12,
             Margin = new Avalonia.Thickness(8)
         };
-        artccCheck.Bind(CheckBox.IsCheckedProperty,
-            new Avalonia.Data.Binding("ShowArtcc")
+
+        cb.Bind(CheckBox.IsCheckedProperty,
+            new Avalonia.Data.Binding(bindingPath)
             {
                 Source = _tsdViewModel,
                 Mode = Avalonia.Data.BindingMode.TwoWay
             });
 
-        var stack = new StackPanel
-        {
-            Margin = new Avalonia.Thickness(4)
-        };
-        stack.Children.Add(artccCheck);
-        PanelBody = stack;
+        return cb;
     }
 }

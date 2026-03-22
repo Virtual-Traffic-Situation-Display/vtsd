@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
@@ -16,6 +15,26 @@ public class VatsimService : IVatsimService, IDisposable
         "https://data.vatsim.net/v3/vatsim-data.json";
     private Timer? _timer;
     private CancellationTokenSource _cts = new();
+
+    // US/Canada bounding box
+    private const double BoxMinLat = 15.0;
+    private const double BoxMaxLat = 75.0;
+    private const double BoxMinLon = -170.0;
+    private const double BoxMaxLon = -50.0;
+
+    // NAT airspace box
+    private const double NatMinLat = 28.0;
+    private const double NatMaxLat = 75.0;
+    private const double NatMinLon = -60.0;
+    private const double NatMaxLon = -15.0;
+
+    // Canadian border airports
+    private static readonly HashSet<string> CanadianAirports = new()
+    {
+        "CYVR", "CYYC", "CYEG", "CYWG", "CYYZ", "CYUL", "CYQB",
+        "CYOW", "CYYT", "CYQX", "CYHZ", "CYFC", "CYSJ", "CYXE",
+        "CYRQ", "CYXU", "CYKF", "CYAM", "CYTS", "CYDF"
+    };
 
     public event EventHandler<List<VatsimPilot>>? PilotsUpdated;
     public List<VatsimPilot> CurrentPilots { get; private set; } = new();
@@ -47,14 +66,10 @@ public class VatsimService : IVatsimService, IDisposable
     {
         try
         {
-            var response = await _httpClient
-                .GetAsync(VatsimUrl, ct);
-
+            var response = await _httpClient.GetAsync(VatsimUrl, ct);
             response.EnsureSuccessStatusCode();
 
-            var json = await response.Content
-                .ReadAsStringAsync(ct);
-
+            var json = await response.Content.ReadAsStringAsync(ct);
             var pilots = Parse(json);
 
             CurrentPilots = pilots;
@@ -72,6 +87,42 @@ public class VatsimService : IVatsimService, IDisposable
         }
     }
 
+    private static bool IsInBox(double lat, double lon,
+        double minLat, double maxLat, double minLon, double maxLon)
+        => lat >= minLat && lat <= maxLat && lon >= minLon && lon <= maxLon;
+
+    private static bool IsUsOrCanadianAirport(string icao)
+    {
+        if (string.IsNullOrEmpty(icao)) return false;
+        if (icao.StartsWith("K", StringComparison.OrdinalIgnoreCase)) return true;
+        if (icao.StartsWith("PA", StringComparison.OrdinalIgnoreCase)) return true;
+        if (icao.StartsWith("PH", StringComparison.OrdinalIgnoreCase)) return true;
+        if (icao.StartsWith("PJ", StringComparison.OrdinalIgnoreCase)) return true;
+        if (icao.StartsWith("TJ", StringComparison.OrdinalIgnoreCase)) return true;
+        if (icao.StartsWith("TK", StringComparison.OrdinalIgnoreCase)) return true;
+        if (icao.StartsWith("TI", StringComparison.OrdinalIgnoreCase)) return true;
+        if (CanadianAirports.Contains(icao.ToUpperInvariant())) return true;
+        return false;
+    }
+
+    private static bool ShouldIncludePilot(double lat, double lon,
+        string arrival, string departure)
+    {
+        // 1. US or Canadian arrival — include regardless of position
+        if (IsUsOrCanadianAirport(arrival)) return true;
+
+        // 2. In US/Canada bounding box
+        if (IsInBox(lat, lon, BoxMinLat, BoxMaxLat, BoxMinLon, BoxMaxLon))
+            return true;
+
+        // 3. In NAT airspace departing from US/Canada
+        if (IsInBox(lat, lon, NatMinLat, NatMaxLat, NatMinLon, NatMaxLon) &&
+            IsUsOrCanadianAirport(departure))
+            return true;
+
+        return false;
+    }
+
     private static List<VatsimPilot> Parse(string json)
     {
         var result = new List<VatsimPilot>();
@@ -86,40 +137,52 @@ public class VatsimService : IVatsimService, IDisposable
             {
                 var gs = p.TryGetProperty("groundspeed", out var gsProp)
                     ? gsProp.GetInt32() : 0;
-
                 if (gs <= 35) continue;
+
+                var lat = p.TryGetProperty("latitude", out var latProp)
+                    ? latProp.GetDouble() : 0;
+                var lon = p.TryGetProperty("longitude", out var lonProp)
+                    ? lonProp.GetDouble() : 0;
+
+                // Read flight plan fields for early filter
+                string arrival = string.Empty;
+                string departure = string.Empty;
+                string aircraftType = string.Empty;
+                string route = string.Empty;
+
+                if (p.TryGetProperty("flight_plan", out var fp) &&
+                    fp.ValueKind == JsonValueKind.Object)
+                {
+                    arrival = fp.TryGetProperty("arrival", out var arr)
+                        ? arr.GetString() ?? string.Empty : string.Empty;
+                    departure = fp.TryGetProperty("departure", out var dep)
+                        ? dep.GetString() ?? string.Empty : string.Empty;
+                    aircraftType = fp.TryGetProperty("aircraft_short", out var ac)
+                        ? ac.GetString() ?? string.Empty : string.Empty;
+                    route = fp.TryGetProperty("route", out var rt)
+                        ? rt.GetString() ?? string.Empty : string.Empty;
+                }
+
+                // Early filter — drop anything not relevant to US/Canada
+                if (!ShouldIncludePilot(lat, lon, arrival, departure))
+                    continue;
 
                 var pilot = new VatsimPilot
                 {
                     Callsign = p.TryGetProperty("callsign", out var cs)
                         ? cs.GetString() ?? string.Empty : string.Empty,
-                    Lat = p.TryGetProperty("latitude", out var lat)
-                        ? lat.GetDouble() : 0,
-                    Lon = p.TryGetProperty("longitude", out var lon)
-                        ? lon.GetDouble() : 0,
+                    Lat = lat,
+                    Lon = lon,
                     Altitude = p.TryGetProperty("altitude", out var alt)
                         ? alt.GetInt32() : 0,
                     GroundSpeed = gs,
                     Heading = p.TryGetProperty("heading", out var hdg)
                         ? hdg.GetInt32() : 0,
+                    AircraftType = aircraftType,
+                    Departure = departure,
+                    Arrival = arrival,
+                    Route = route
                 };
-
-                if (p.TryGetProperty("flight_plan", out var fp) &&
-                    fp.ValueKind == JsonValueKind.Object)
-                {
-                    pilot.AircraftType = fp.TryGetProperty("aircraft_short",
-                        out var ac) ? ac.GetString() ?? string.Empty
-                        : string.Empty;
-                    pilot.Departure = fp.TryGetProperty("departure",
-                        out var dep) ? dep.GetString() ?? string.Empty
-                        : string.Empty;
-                    pilot.Arrival = fp.TryGetProperty("arrival",
-                        out var arr) ? arr.GetString() ?? string.Empty
-                        : string.Empty;
-                    pilot.Route = fp.TryGetProperty("route",
-                        out var rt) ? rt.GetString() ?? string.Empty
-                        : string.Empty;
-                }
 
                 result.Add(pilot);
             }
@@ -131,7 +194,7 @@ public class VatsimService : IVatsimService, IDisposable
         }
 
         System.Diagnostics.Debug.WriteLine(
-            $"VatsimService: parsed {result.Count} airborne pilots");
+            $"VatsimService: parsed {result.Count} relevant pilots");
         return result;
     }
 

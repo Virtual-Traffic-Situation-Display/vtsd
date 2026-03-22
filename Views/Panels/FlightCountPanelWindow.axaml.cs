@@ -26,7 +26,6 @@ public partial class FlightCountPanelWindow : BasePanelWindow
         InitializeComponent();
         BuildContent();
 
-        // Start pinned — always on top
         if (DataContext is BasePanelViewModel vm)
             vm.IsPinned = true;
     }
@@ -44,27 +43,30 @@ public partial class FlightCountPanelWindow : BasePanelWindow
         {
             stack.Children.Clear();
 
-            // Header
+            string bgColor = _tsdViewModel.DisplaySettings.BackgroundColor;
+
+            // Header — always white background, black text
             stack.Children.Add(BuildRow(
-                "Arr", "Dep", "Actv", "Visib", true));
+                "Arr", "Dep", "Actv", "Visib",
+                isHeader: true,
+                textColor: "#000000",
+                bgHex: "#ffffff"));
 
-            stack.Children.Add(new Border
-            {
-                Height = 1,
-                Background = new SolidColorBrush(
-                    Color.Parse("#aaaaaa"))
-            });
-
-            // ALL row — always black
+            // ALL row — background color, contrasting text
             var allRow = _vm.Rows.FirstOrDefault();
             if (allRow != null)
+            {
+                string contrastColor = GetContrastColor(bgColor);
                 stack.Children.Add(BuildRow(
                     allRow.Arr, allRow.Dep,
                     allRow.Active.ToString(),
                     allRow.Visible.ToString(),
-                    false, "#000000"));
+                    isHeader: false,
+                    textColor: contrastColor,
+                    bgHex: bgColor));
+            }
 
-            // Filter rows — use filter color
+            // Filter rows — background color, filter text color
             var filters = _tsdViewModel.SelectFlightsViewModel
                 .Filters
                 .Where(f => f.Show &&
@@ -83,7 +85,9 @@ public partial class FlightCountPanelWindow : BasePanelWindow
                     row.Arr, row.Dep,
                     row.Active.ToString(),
                     row.Visible.ToString(),
-                    false, color));
+                    isHeader: false,
+                    textColor: color,
+                    bgHex: bgColor));
             }
         }
 
@@ -96,19 +100,30 @@ public partial class FlightCountPanelWindow : BasePanelWindow
         PanelBody = scroll;
     }
 
-    private static Control BuildRow(string arr, string dep,
-    string active, string visible, bool isHeader,
-    string textColor = "#000000")
+    // Returns black or white depending on which contrasts better with bgHex
+    private static string GetContrastColor(string bgHex)
     {
-        var bg = isHeader
-            ? Color.Parse("#ffe4c4")
-            : Color.Parse("#ffffff");
+        try
+        {
+            var color = Color.Parse(bgHex);
+            // Perceived luminance formula
+            double luminance = (0.299 * color.R + 0.587 * color.G + 0.114 * color.B) / 255;
+            return luminance > 0.5 ? "#000000" : "#ffffff";
+        }
+        catch
+        {
+            return "#000000";
+        }
+    }
 
+    private static Control BuildRow(string arr, string dep,
+        string active, string visible, bool isHeader,
+        string textColor = "#000000", string bgHex = "#ffffff")
+    {
         var border = new Border
         {
-            Background = new SolidColorBrush(bg),
-            BorderBrush = new SolidColorBrush(
-                Color.Parse("#aaaaaa")),
+            Background = new SolidColorBrush(Color.Parse(bgHex)),
+            BorderBrush = new SolidColorBrush(Color.Parse("#aaaaaa")),
             BorderThickness = new Avalonia.Thickness(0, 0, 0, 1)
         };
 
@@ -118,8 +133,7 @@ public partial class FlightCountPanelWindow : BasePanelWindow
         };
 
         var font = new FontFamily("Courier New");
-        var foreground = new SolidColorBrush(
-            Color.Parse(textColor));
+        var foreground = new SolidColorBrush(Color.Parse(textColor));
 
         var texts = new[] { arr, dep, active, visible };
         for (int i = 0; i < texts.Length; i++)
@@ -141,8 +155,7 @@ public partial class FlightCountPanelWindow : BasePanelWindow
 
             var cell = new Border
             {
-                BorderBrush = new SolidColorBrush(
-                    Color.Parse("#aaaaaa")),
+                BorderBrush = new SolidColorBrush(Color.Parse("#aaaaaa")),
                 BorderThickness = new Avalonia.Thickness(
                     i == 0 ? 0 : 1, 0, 0, 0),
                 Child = tb
