@@ -40,18 +40,18 @@ public partial class ColorPickerWindow : BasePanelWindow
 
         var presets = new List<(string Name, string Hex)>
         {
-            ("Black",   "#000000"),
-            ("Blue",    "#0000FF"),
-            ("Orange",  "#FF8C00"),
             ("Red",     "#FF0000"),
-            ("Green",   "#008000"),
-            ("Gray",    "#808080"),
+            ("Orange",  "#FF8C00"),
             ("Yellow",  "#FFFF00"),
+            ("Lime",    "#00FF00"),
+            ("Green",   "#008000"),
             ("Cyan",    "#00CCFF"),
-            ("White",   "#FFFFFF"),
+            ("Blue",    "#0000FF"),
             ("Purple",  "#800080"),
             ("Magenta", "#FF00FF"),
-            ("Lime",    "#00FF00"),
+            ("White",   "#FFFFFF"),
+            ("Gray",    "#808080"),
+            ("Black",   "#000000"),
         };
 
         var presetWrap = new WrapPanel
@@ -86,7 +86,10 @@ public partial class ColorPickerWindow : BasePanelWindow
             ToolTip.SetTip(swatch, name);
 
             swatch.PointerPressed += (_, _) =>
-                colorView.Color = Avalonia.Media.Color.Parse(hex);
+            {
+                ColorSelected?.Invoke(this, hex);
+                Close();
+            };
 
             swatch.PointerEntered += (_, _) =>
                 swatch.BorderBrush = new SolidColorBrush(
@@ -96,15 +99,6 @@ public partial class ColorPickerWindow : BasePanelWindow
 
             presetWrap.Children.Add(swatch);
         }
-
-        var applyBtn = new Button
-        {
-            Content = "Apply",
-            FontFamily = new FontFamily("Arial"),
-            FontSize = 11,
-            MinWidth = 70,
-            Margin = new Avalonia.Thickness(4)
-        };
 
         var okBtn = new Button
         {
@@ -124,14 +118,6 @@ public partial class ColorPickerWindow : BasePanelWindow
             Margin = new Avalonia.Thickness(4)
         };
 
-        applyBtn.Click += (_, _) =>
-        {
-            var selected = $"#{colorView.Color.R:X2}" +
-                           $"{colorView.Color.G:X2}" +
-                           $"{colorView.Color.B:X2}";
-            ColorSelected?.Invoke(this, selected);
-        };
-
         okBtn.Click += (_, _) =>
         {
             var selected = $"#{colorView.Color.R:X2}" +
@@ -149,7 +135,7 @@ public partial class ColorPickerWindow : BasePanelWindow
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Avalonia.Thickness(8)
         };
-        buttonRow.Children.Add(applyBtn);
+
         buttonRow.Children.Add(okBtn);
         buttonRow.Children.Add(cancelBtn);
 
