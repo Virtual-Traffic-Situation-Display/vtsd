@@ -6,9 +6,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Reflection;
 using vTFMS.Models;
 using vTFMS.Services;
 using vTFMS.ViewModels;
+using vTFMS.Views;
 using vTFMS.Views.Panels;
 
 namespace vTFMS.ViewModels;
@@ -46,6 +48,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private string _currentTime = string.Empty;
+
+    public string AppVersion { get; } =
+    Assembly.GetExecutingAssembly()
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+        ?.InformationalVersion ?? "dev";
 
     private readonly System.Threading.Timer _clockTimer;
 
@@ -133,6 +140,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
     _panelManager.OpenWithArgs(
         new NasMonitorPanelWindow(
             TsdViewModel, _mapDataService));
+
+    [RelayCommand]
+    private void OpenAbout()
+    {
+        var about = new AboutWindow(AppVersion);
+        about.Show(_mainWindow);
+    }
 
     // ── Filters commands ──────────────────────────────────────
 
