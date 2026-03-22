@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+jobs:
+  publish:
+    strategy:
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+            artifact: vTFMS-win-x64
+          - rid: linux-x64
+            os: ubuntu-latest
+            artifact: vTFMS-linux-x64
+          - rid: osx-x64
+            os: macos-latest
+            artifact: vTFMS-osx-x64
+          - rid: osx-arm64
+            os: macos-latest
+            artifact: vTFMS-osx-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'preview'
+
+      - name: Publish
+        run: dotnet publish -c Release -r ${{ matrix.rid }} -p:Version=${GITHUB_REF_NAME#v}
+        shell: bash
+
+      - name: Zip output
+        run: |
+          cd bin/Release/net10.0/${{ matrix.rid }}/publish
+          7z a -tzip ${{ github.workspace }}/${{ matrix.artifact }}.zip .
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.zip
+
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*.zip
+          generate_release_notes: true
