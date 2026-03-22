@@ -46,6 +46,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _flightCountWindow.Show(_mainWindow);
     }
 
+    [RelayCommand]
+    private void ToggleVatsimData()
+    {
+        TsdViewModel.VatsimDataEnabled = !TsdViewModel.VatsimDataEnabled;
+        OnPropertyChanged(nameof(VatsimDataEnabled));
+    }
+
+    public bool VatsimDataEnabled => TsdViewModel.VatsimDataEnabled;
+
     [ObservableProperty]
     private string _currentTime = string.Empty;
 
@@ -81,6 +90,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             if (e.PropertyName == nameof(TsdViewModel.VatsimConnected))
                 OnPropertyChanged(nameof(VatsimConnected));
+            if (e.PropertyName == nameof(TsdViewModel.VatsimDataEnabled))
+                OnPropertyChanged(nameof(VatsimDataEnabled));
         };
     }
 

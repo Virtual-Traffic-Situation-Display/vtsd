@@ -115,12 +115,17 @@
 
       <MenuItem Header="Flights" Foreground="{StaticResource ForegroundPrimaryBrush}"
                 FontFamily="Arial" FontSize="13">
-        <MenuItem Header="Select Flights..."
-                  FontFamily="Arial" FontSize="12"
-                  Command="{Binding OpenSelectFlightsCommand}"/>
-        <MenuItem Header="Show/Hide Flight Count"
-                  FontFamily="Arial" FontSize="12"
-                  Command="{Binding ToggleFlightCountCommand}"/>
+          <MenuItem Header="Enable VATSIM Data"
+                    FontFamily="Arial" FontSize="12"
+                    Command="{Binding ToggleVatsimDataCommand}"
+                    Icon="{Binding VatsimDataEnabled,
+                           Converter={StaticResource BoolToCheckConverter}}"/>
+          <MenuItem Header="Select Flights..."
+                    FontFamily="Arial" FontSize="12"
+                    Command="{Binding OpenSelectFlightsCommand}"/>
+          <MenuItem Header="Show/Hide Flight Count"
+                    FontFamily="Arial" FontSize="12"
+                    Command="{Binding ToggleFlightCountCommand}"/>
       </MenuItem>
 
     <MenuItem Header="Alerts" Foreground="{StaticResource ForegroundPrimaryBrush}"
@@ -179,12 +184,14 @@
       <Grid ColumnDefinitions="Auto,*,Auto">
 
         <Image Grid.Column="0"
-               Source="avares://vTFMS/Assets/vatsim-logo.png"
-               Height="20"
-               Margin="0,0,8,0"
-               VerticalAlignment="Center"
-               IsVisible="{Binding VatsimConnected}"
-               ToolTip.Tip="VATSIM data active"/>
+           Source="avares://vTFMS/Assets/vatsim-logo.png"
+           Height="20"
+           Margin="0,0,8,0"
+           VerticalAlignment="Center"
+           Opacity="{Binding VatsimDataEnabled,
+                     Converter={StaticResource BoolToOpacityConverter}}"
+           ToolTip.Tip="{Binding VatsimDataEnabled,
+                         Converter={StaticResource BoolToVatsimTipConverter}}"/>
 
         <TextBlock Grid.Column="1"
            Text="{Binding AppVersion, StringFormat='v{0}'}"
