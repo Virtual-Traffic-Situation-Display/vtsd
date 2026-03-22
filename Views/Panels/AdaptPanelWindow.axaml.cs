@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using System;
 using vTFMS.ViewModels;
+using vTFMS.Services;
 using vTFMS.ViewModels.Panels;
 
 namespace vTFMS.Views.Panels;
@@ -14,9 +15,9 @@ public partial class AdaptPanelWindow : BasePanelWindow
             "Use the constructor that takes a TsdViewModel.");
     }
 
-    public AdaptPanelWindow(TsdViewModel tsdViewModel)
+    public AdaptPanelWindow(TsdViewModel tsdViewModel, IFontService fontService)
     {
-        var vm = new AdaptPanelViewModel(tsdViewModel);
+        var vm = new AdaptPanelViewModel(tsdViewModel, fontService);
         vm.OkRequested += (_, _) => Close();
         DataContext = vm;
         InitializeComponent();

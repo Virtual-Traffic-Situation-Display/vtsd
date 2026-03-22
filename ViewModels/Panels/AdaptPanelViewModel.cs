@@ -1,7 +1,9 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System;
+using System.Collections.Generic;
 using vTFMS.Models;
+using vTFMS.Services;
 using vTFMS.ViewModels;
 
 namespace vTFMS.ViewModels.Panels;
@@ -28,13 +30,18 @@ public partial class AdaptPanelViewModel : BasePanelViewModel
     [ObservableProperty] private string _dataBlockColor = string.Empty;
     [ObservableProperty] private string _mapLabelColor = string.Empty;
 
+    public List<string> AvailableFonts { get; }
+    public List<double> AvailableSizes { get; } = new() { 8, 9, 10, 11, 12, 14 };
+
     // Prevents live-push during initial LoadFromSettings
     private bool _isLoading;
 
-    public AdaptPanelViewModel(TsdViewModel tsdViewModel)
+    public AdaptPanelViewModel(TsdViewModel tsdViewModel, IFontService fontService)
     {
         Title = "Customize Colors and Fonts";
         _tsdViewModel = tsdViewModel;
+
+        AvailableFonts = fontService.GetMonospaceFonts();
 
         _original = _tsdViewModel.DisplaySettings.Clone();
 
