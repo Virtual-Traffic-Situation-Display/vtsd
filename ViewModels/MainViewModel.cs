@@ -54,7 +54,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowAllAircraft));
     }
 
-public bool ShowAllAircraft => TsdViewModel.ShowAllAircraft;
+    public bool ShowAllAircraft => TsdViewModel.ShowAllAircraft;
 
     [RelayCommand]
     private void ToggleVatsimData()
@@ -117,7 +117,8 @@ public bool ShowAllAircraft => TsdViewModel.ShowAllAircraft;
 
     [RelayCommand]
     private void OpenMoveZoom() =>
-        _panelManager.Open<MoveZoomPanelWindow>();
+        _panelManager.OpenWithArgs(
+            new MoveZoomPanelWindow(TsdViewModel));
 
     [RelayCommand]
     private void OpenShowMapItem() =>
@@ -125,12 +126,13 @@ public bool ShowAllAircraft => TsdViewModel.ShowAllAircraft;
 
     [RelayCommand]
     private void OpenRangeRings() =>
-        _panelManager.Open<RangeRingsPanelWindow>();
+        _panelManager.OpenWithArgs(
+            new RangeRingsPanelWindow(TsdViewModel));
 
     [RelayCommand]
     private void OpenOverlays() =>
-    _panelManager.OpenWithArgs(
-        new OverlaysPanelWindow(TsdViewModel));
+        _panelManager.OpenWithArgs(
+            new OverlaysPanelWindow(TsdViewModel));
 
     [RelayCommand]
     private void OpenRunwayLayout() =>

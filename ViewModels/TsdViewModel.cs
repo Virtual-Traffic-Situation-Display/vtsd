@@ -198,6 +198,7 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     public ObservableCollection<MapItem> ActiveMapItems { get; } = new();
     public ObservableCollection<VatsimPilot> VisiblePilots { get; } = new();
     public SelectFlightsPanelViewModel SelectFlightsViewModel { get; }
+    public ObservableCollection<RangeRingConfig> RangeRings { get; } = new();
 
     public TsdViewModel(IMapDataService mapDataService,
                         IVatsimService vatsimService,
@@ -431,6 +432,20 @@ public partial class TsdViewModel : ObservableObject, IDisposable
         if (notFound > 0) message += $", not found: {string.Join(" ", notFoundList)}";
 
         return (added > 0, message);
+    }
+
+    public (double lat, double lon)? ResolveIdentifier(string id)
+    {
+        var airport = _mapDataService.FindAirport(id);
+        if (airport != null) return (airport.Lat, airport.Lon);
+    
+        var navaid = _mapDataService.FindNavaid(id);
+        if (navaid != null) return (navaid.Lat, navaid.Lon);
+    
+        var waypoint = _mapDataService.FindWaypoint(id);
+        if (waypoint != null) return (waypoint.Lat, waypoint.Lon);
+    
+        return null;
     }
 
     public void RemoveMapItem(MapItem item)

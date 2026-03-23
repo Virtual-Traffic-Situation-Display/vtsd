@@ -2,6 +2,91 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:panels="using:vTFMS.Views.Panels"
+    xmlns:vm="using:vTFMS.ViewModels.Panels"
     x:Class="vTFMS.Views.Panels.MoveZoomPanelWindow"
-    Width="320" Height="240">
+    x:DataType="vm:MoveZoomPanelViewModel"
+    Width="340" Height="300"
+    RequestedThemeVariant="Light">
+
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="8">
+
+    <!-- Center coordinates -->
+    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,8,Auto,*"
+          RowDefinitions="Auto" Margin="0,0,0,8">
+      <TextBlock Grid.Column="0"
+                 Text="Lat:"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center" Margin="0,0,6,0"/>
+      <TextBox Grid.Column="1"
+               Text="{Binding Latitude, StringFormat={}{0:F4}}"
+               FontFamily="Arial" FontSize="11"
+               Height="26"/>
+      <TextBlock Grid.Column="3"
+                 Text="Lon:"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center" Margin="0,0,6,0"/>
+      <TextBox Grid.Column="4"
+               Text="{Binding Longitude, StringFormat={}{0:F4}}"
+               FontFamily="Arial" FontSize="11"
+               Height="26"/>
+    </Grid>
+
+    <!-- Center on identifier -->
+    <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto"
+          Margin="0,0,0,8">
+      <TextBlock Grid.Column="0"
+                 Text="Center on:"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center" Margin="0,0,6,0"/>
+      <TextBox Grid.Column="1"
+               Text="{Binding CenterIdentifier}"
+               FontFamily="Arial" FontSize="11"
+               Height="26"/>
+      <Button Grid.Column="2"
+              Content="Go"
+              Command="{Binding GoToIdentifierCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="6,0,0,0"
+              MinWidth="40"/>
+    </Grid>
+
+    <!-- Range -->
+    <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto"
+          Margin="0,0,0,12">
+      <TextBlock Grid.Column="0"
+                 Text="Range:"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center" Margin="0,0,6,0"/>
+      <TextBox Grid.Column="1"
+               Text="{Binding RangeNm, StringFormat={}{0:F1}}"
+               FontFamily="Arial" FontSize="11"
+               Height="26"/>
+      <TextBlock Grid.Column="2"
+                 Text="NM"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center" Margin="6,0,0,0"/>
+    </Grid>
+
+    <!-- Status -->
+    <TextBlock Grid.Row="3"
+               Text="{Binding StatusMessage}"
+               FontFamily="Arial" FontSize="10"
+               Margin="0,0,0,8"/>
+
+    <!-- Buttons -->
+    <StackPanel Grid.Row="4"
+                Orientation="Horizontal"
+                HorizontalAlignment="Center">
+      <Button Content="Apply"
+              Command="{Binding ApplyCommand}"
+              FontFamily="Arial" FontSize="11"
+              MinWidth="60" Margin="4"/>
+      <Button Content="Reset"
+              Command="{Binding ResetCommand}"
+              FontFamily="Arial" FontSize="11"
+              MinWidth="60" Margin="4"/>
+    </StackPanel>
+
+  </Grid>
+
 </panels:BasePanelWindow>

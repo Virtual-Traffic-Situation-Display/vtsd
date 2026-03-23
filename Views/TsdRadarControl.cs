@@ -192,6 +192,13 @@ public class TsdRadarControl : Control
         AvaloniaProperty.Register<TsdRadarControl, DisplaySettings>(
             nameof(DisplaySettings), new DisplaySettings());
 
+    public static readonly StyledProperty<ObservableCollection<RangeRingConfig>>
+        RangeRingsProperty =
+        AvaloniaProperty.Register<TsdRadarControl,
+            ObservableCollection<RangeRingConfig>>(
+            nameof(RangeRings),
+            new ObservableCollection<RangeRingConfig>());
+
     #endregion
 
     #region CLR Property Wrappers
@@ -358,6 +365,11 @@ public class TsdRadarControl : Control
         set => SetValue(DisplaySettingsProperty, value);
     }
 
+    public ObservableCollection<RangeRingConfig> RangeRings
+    {
+        get => GetValue(RangeRingsProperty);
+        set => SetValue(RangeRingsProperty, value);
+    }
     #endregion
 
     static TsdRadarControl()
@@ -385,7 +397,8 @@ public class TsdRadarControl : Control
             RadarImageDataProperty,
             ShowWeatherProperty,
             DisplaySettingsProperty,
-            RadarOpacityProperty);
+            RadarOpacityProperty,
+            RangeRingsProperty);
     }
 
     public TsdRadarControl()
@@ -674,6 +687,7 @@ public class TsdRadarControl : Control
         if (ShowArtcc && _artccBoundaryGeometry != null)
             context.DrawGeometry(null, _artccPen, _artccBoundaryGeometry);
 
+        DrawRangeRings(context, width, height);
         DrawRoutes(context, width, height);
         DrawActiveMapItems(context, width, height);
         DrawAircraft(context, width, height);
@@ -962,6 +976,88 @@ public class TsdRadarControl : Control
             }
 
             context.DrawGeometry(null, pen, geo);
+        }
+    }
+
+    private void DrawRangeRings(DrawingContext context,
+        double width, double height)
+    {
+        if (RangeRings.Count == 0) return;
+
+        var pen = new Pen(new SolidColorBrush(
+            Color.Parse("#888888")), 0.8);
+        var labelBrush = new SolidColorBrush(
+            Color.Parse("#888888"));
+
+        foreach (var config in RangeRings)
+        {
+            int ringCount = config.DistanceNm / config.IntervalNm;
+
+            for (int r = 1; r <= ringCount; r++)
+            {
+                double radiusNm = r * config.IntervalNm;
+
+                // Build a polygon approximating the circle
+                // 1 NM = 1/60 degree of latitude
+                double radiusDegLat = radiusNm / 60.0;
+                double radiusDegLon = radiusDegLat /
+                    Math.Cos(config.CenterLat * Math.PI / 180.0);
+
+                var geo = new StreamGeometry();
+                using (var ctx = geo.Open())
+                {
+                    const int segments = 72;
+                    for (int i = 0; i <= segments; i++)
+                    {
+                        double angle = 2.0 * Math.PI * i / segments;
+                        double lat = config.CenterLat +
+                            radiusDegLat * Math.Sin(angle);
+                        double lon = config.CenterLon +
+                            radiusDegLon * Math.Cos(angle);
+
+                        var pt = LatLonToScreen(lat, lon, width, height);
+
+                        if (i == 0)
+                            ctx.BeginFigure(pt, false);
+                        else
+                            ctx.LineTo(pt);
+                    }
+                    ctx.EndFigure(true);
+                }
+
+                context.DrawGeometry(null, pen, geo);
+
+                // Ring distance label at 12 o'clock
+                double labelLat = config.CenterLat + radiusDegLat;
+                var labelPt = LatLonToScreen(
+                    labelLat, config.CenterLon, width, height);
+
+                var ringLabel = new FormattedText(
+                    $"{radiusNm}nm",
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight,
+                    _mapLabelTypeface, 12, labelBrush);
+
+                context.DrawText(ringLabel, new Point(
+                    labelPt.X - ringLabel.Width / 2,
+                    labelPt.Y - ringLabel.Height - 2));
+            }
+
+            // Draw center dot and label
+            var centerPt = LatLonToScreen(
+                config.CenterLat, config.CenterLon, width, height);
+
+            context.FillRectangle(labelBrush,
+                new Rect(centerPt.X - 2, centerPt.Y - 2, 4, 4));
+
+            var label = new FormattedText(
+                config.Identifier,
+                System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                _mapLabelTypeface, 9, labelBrush);
+
+            context.DrawText(label, new Point(
+                centerPt.X + 4, centerPt.Y - label.Height / 2));
         }
     }
 
