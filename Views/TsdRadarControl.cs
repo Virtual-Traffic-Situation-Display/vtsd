@@ -427,7 +427,8 @@ public class TsdRadarControl : Control
             change.Property == ShowCountryBoundariesProperty ||
             change.Property == ArtccBoundariesProperty ||
             change.Property == ShowArtccProperty ||
-            change.Property == DisplaySettingsProperty)
+            change.Property == DisplaySettingsProperty ||
+            change.Property == RangeRingsProperty)
         {
             _geometriesDirty = true;
 
