@@ -26,7 +26,7 @@ public partial class AboutWindow : Window
     {
         Process.Start(new ProcessStartInfo
         {
-            FileName = "YOUR_DISCORD_INVITE_LINK_HERE",
+            FileName = "https://discord.gg/a3Br8KqcJ4",
             UseShellExecute = true
         });
     }
