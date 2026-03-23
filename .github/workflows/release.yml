@@ -39,8 +39,9 @@ jobs:
 
       - name: Zip output
         run: |
+          OUTDIR="$(pwd)"
           cd bin/Release/net10.0/${{ matrix.rid }}/publish
-          7z a -tzip ${{ github.workspace }}/${{ matrix.artifact }}.zip .
+          7z a -tzip "$OUTDIR/${{ matrix.artifact }}.zip" .
         shell: bash
 
       - name: Upload artifact
