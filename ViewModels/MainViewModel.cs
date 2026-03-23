@@ -175,6 +175,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         about.Show(_mainWindow);
     }
 
+    [RelayCommand]
+    private void OpenAltitudeFilter() =>
+        _panelManager.OpenWithArgs(
+            new AltitudeFilterPanelWindow(TsdViewModel));
+
     // ── Filters commands ──────────────────────────────────────
 
     [RelayCommand]

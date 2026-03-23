@@ -890,6 +890,17 @@ public class MapDataService : IMapDataService
         return result;
     }
 
+    public List<TraconBoundary> FindTracons(string identifier)
+    {
+        // Reuse the already-loaded TRACON data from TsdViewModel
+        // rather than reloading from disk each time
+        var allTracons = LoadTraconBoundaries();
+        return allTracons
+            .Where(t => t.Identifier.Equals(
+                identifier, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
     public List<ArtccBoundary> LoadArtccBoundaries()
     {
         var result = new List<ArtccBoundary>();

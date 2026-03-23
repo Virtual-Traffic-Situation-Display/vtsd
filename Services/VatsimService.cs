@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
@@ -15,6 +16,7 @@ public class VatsimService : IVatsimService, IDisposable
         "https://data.vatsim.net/v3/vatsim-data.json";
     private Timer? _timer;
     private CancellationTokenSource _cts = new();
+    private Dictionary<string, VatsimPilot> _pilotCache = new();
 
     // US/Canada bounding box
     private const double BoxMinLat = 15.0;
@@ -73,10 +75,11 @@ public class VatsimService : IVatsimService, IDisposable
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var pilots = Parse(json);
+            var rawPilots = Parse(json);
+            var merged = MergeWithCache(rawPilots);
 
-            CurrentPilots = pilots;
-            PilotsUpdated?.Invoke(this, pilots);
+            CurrentPilots = merged;
+            PilotsUpdated?.Invoke(this, merged);
         }
         catch (OperationCanceledException)
         {
@@ -88,6 +91,39 @@ public class VatsimService : IVatsimService, IDisposable
             System.Diagnostics.Debug.WriteLine(
                 $"VatsimService: fetch failed — {ex.Message}");
         }
+    }
+
+    private List<VatsimPilot> MergeWithCache(List<VatsimPilot> incoming)
+    {
+        var newCache = new Dictionary<string, VatsimPilot>();
+
+        foreach (var pilot in incoming)
+        {
+            if (_pilotCache.TryGetValue(pilot.Callsign, out var existing))
+            {
+                // Update existing pilot, preserving speed history and parsed route
+                existing.Lat = pilot.Lat;
+                existing.Lon = pilot.Lon;
+                existing.Altitude = pilot.Altitude;
+                existing.GroundSpeed = pilot.GroundSpeed;
+                existing.Heading = pilot.Heading;
+                existing.AircraftType = pilot.AircraftType;
+                existing.Departure = pilot.Departure;
+                existing.Arrival = pilot.Arrival;
+                existing.Route = pilot.Route;
+                existing.RecordSpeed(pilot.GroundSpeed);
+                newCache[pilot.Callsign] = existing;
+            }
+            else
+            {
+                // New pilot — seed speed history
+                pilot.RecordSpeed(pilot.GroundSpeed);
+                newCache[pilot.Callsign] = pilot;
+            }
+        }
+
+        _pilotCache = newCache;
+        return newCache.Values.ToList();
     }
 
     private static bool IsInBox(double lat, double lon,
@@ -111,18 +147,12 @@ public class VatsimService : IVatsimService, IDisposable
     private static bool ShouldIncludePilot(double lat, double lon,
         string arrival, string departure)
     {
-        // 1. US or Canadian arrival — include regardless of position
         if (IsUsOrCanadianAirport(arrival)) return true;
-
-        // 2. In US/Canada bounding box
         if (IsInBox(lat, lon, BoxMinLat, BoxMaxLat, BoxMinLon, BoxMaxLon))
             return true;
-
-        // 3. In NAT airspace departing from US/Canada
         if (IsInBox(lat, lon, NatMinLat, NatMaxLat, NatMinLon, NatMaxLon) &&
             IsUsOrCanadianAirport(departure))
             return true;
-
         return false;
     }
 
@@ -147,7 +177,6 @@ public class VatsimService : IVatsimService, IDisposable
                 var lon = p.TryGetProperty("longitude", out var lonProp)
                     ? lonProp.GetDouble() : 0;
 
-                // Read flight plan fields for early filter
                 string arrival = string.Empty;
                 string departure = string.Empty;
                 string aircraftType = string.Empty;
@@ -166,7 +195,6 @@ public class VatsimService : IVatsimService, IDisposable
                         ? rt.GetString() ?? string.Empty : string.Empty;
                 }
 
-                // Early filter — drop anything not relevant to US/Canada
                 if (!ShouldIncludePilot(lat, lon, arrival, departure))
                     continue;
 

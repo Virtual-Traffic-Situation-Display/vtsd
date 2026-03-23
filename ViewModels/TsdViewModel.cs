@@ -110,6 +110,32 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _showFlightCount = false;
 
+    [ObservableProperty]
+    private bool _altitudeFilterEnabled = false;
+
+    [ObservableProperty]
+    private int _altitudeFloor = 0;
+
+    [ObservableProperty]
+    private int _altitudeCeiling = 99999;
+
+    partial void OnAltitudeFilterEnabledChanged(bool value)
+    {
+        RefreshVisiblePilots(_vatsimService.CurrentPilots);
+    }
+
+    partial void OnAltitudeFloorChanged(int value)
+    {
+        if (AltitudeFilterEnabled)
+            RefreshVisiblePilots(_vatsimService.CurrentPilots);
+    }
+
+    partial void OnAltitudeCeilingChanged(int value)
+    {
+        if (AltitudeFilterEnabled)
+            RefreshVisiblePilots(_vatsimService.CurrentPilots);
+    }
+
     // Cached airway lists — populated on first request
     //private List<Airway>? _jetRoutes;
     //private List<Airway>? _victorRoutes;
@@ -515,6 +541,12 @@ public partial class TsdViewModel : ObservableObject, IDisposable
             foreach (var pilot in pilots)
             {
                 if (!IsInMapView(pilot.Lat, pilot.Lon)) continue;
+
+                // Altitude filter
+                if (AltitudeFilterEnabled &&
+                    (pilot.Altitude < AltitudeFloor ||
+                     pilot.Altitude > AltitudeCeiling))
+                    continue;
     
                 bool matchedFilter = false;
                 foreach (var filter in activeFilters)

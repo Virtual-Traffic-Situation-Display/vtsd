@@ -36,6 +36,15 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
 
     private Dictionary<string, ArtccThreshold> _thresholds = new();
 
+    public ObservableCollection<TraconMonitorConfig> MonitoredTracons { get; } = new();
+    public Dictionary<string, int[]> TraconCounts { get; private set; } = new();
+
+    [ObservableProperty]
+    private string _traconIdentifier = string.Empty;
+
+    [ObservableProperty]
+    private int _traconAltitude = 99999;
+
     // Combine rules — list of parent+children rules
     public List<SectorCombineRule> CombineRules { get; private set; } = new();
 
@@ -209,9 +218,11 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
         _cellDetails.Clear();
         SectorCounts.Clear();
         ArtccCounts.Clear();
+        TraconCounts.Clear();
         OnPropertyChanged(nameof(Rows));
         OnPropertyChanged(nameof(SectorCounts));
         OnPropertyChanged(nameof(ArtccCounts));
+        OnPropertyChanged(nameof(TraconCounts));
     }
 
     public async Task RecalculateAsync()
@@ -229,6 +240,7 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
 
         var artccList = _tsdViewModel.ArtccBoundaries.ToList();
         var rules = CombineRules.ToList();
+        var monitoredTracons = MonitoredTracons.ToList();
 
         // Build lookup: child sector → parent sector
         var childToParent = new Dictionary<string, string>(
@@ -254,7 +266,7 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
         int colCount = timeSlots.Count;
         int[] minutes = timeSlots.ToArray();
 
-        var (artccCounts, sectorCounts, details) = await Task.Run(() =>
+        var (artccCounts, sectorCounts, details, traconCounts) = await Task.Run(() =>
         {
             var artccResult = new Dictionary<string, int[]>(
                 StringComparer.OrdinalIgnoreCase);
@@ -348,7 +360,56 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
                 }
             }
 
-            return (artccResult, sectorResult, detailMap);
+            // TRACON counts
+            var traconResult = new Dictionary<string, int[]>(
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var config in monitoredTracons)
+            {
+                traconResult[config.Identifier] = new int[colCount];
+                var boundaries = _mapDataService.FindTracons(config.Identifier);
+                var allRings = boundaries.SelectMany(b => b.Rings).ToList();
+
+                foreach (var pilot in pilots)
+                {
+                    if (pilot.GroundSpeed <= 35) continue;
+
+                    try
+                    {
+                        for (int col = 0; col < colCount; col++)
+                        {
+                            LatLon? pos;
+                            int estimatedAlt;
+
+                            if (minutes[col] == 0)
+                            {
+                                pos = new LatLon(pilot.Lat, pilot.Lon);
+                                estimatedAlt = pilot.Altitude;
+                            }
+                            else
+                            {
+                                pos = RouteProjector.ProjectPosition(
+                                    pilot, minutes[col]);
+                                if (pos == null) continue;
+                                estimatedAlt = _mapDataService.EstimateAltitude(
+                                    pilot, pos);
+                            }
+
+                            if (estimatedAlt > config.AltitudeCeiling) continue;
+
+                            bool inside = allRings.Any(ring =>
+                                _mapDataService.IsPointInPolygon(
+                                    pos.Lat, pos.Lon, ring));
+
+                            if (inside)
+                                traconResult[config.Identifier][col]++;
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            return (artccResult, sectorResult, detailMap, traconResult);
         });
 
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
@@ -362,6 +423,7 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
             _cellDetails = details;
             SectorCounts = sectorCounts;
             ArtccCounts = artccCounts;
+            TraconCounts = traconCounts;
 
             for (int a = 0; a < Rows.Count && a < artccList.Count; a++)
             {
@@ -378,7 +440,38 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
             OnPropertyChanged(nameof(Rows));
             OnPropertyChanged(nameof(SectorCounts));
             OnPropertyChanged(nameof(ArtccCounts));
+            OnPropertyChanged(nameof(TraconCounts));
         });
+    }
+
+    [RelayCommand]
+    private void AddTracon()
+    {
+        var id = TraconIdentifier.Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(id)) return;
+
+        if (MonitoredTracons.Any(t =>
+            t.Identifier.Equals(id, StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        var tracons = _mapDataService.FindTracons(id);
+        if (tracons.Count == 0) return;
+
+        MonitoredTracons.Add(new TraconMonitorConfig
+        {
+            Identifier = id,
+            AltitudeCeiling = TraconAltitude
+        });
+
+        TraconIdentifier = string.Empty;
+        if (IsEnabled) _ = RecalculateAsync();
+    }
+
+    [RelayCommand]
+    private void RemoveTracon(TraconMonitorConfig config)
+    {
+        MonitoredTracons.Remove(config);
+        if (IsEnabled) _ = RecalculateAsync();
     }
 
     [RelayCommand]
@@ -427,7 +520,8 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
         var settings = new NasMonitorSettings
         {
             Thresholds = _thresholds.Values.ToList(),
-            CombineRules = CombineRules.ToList()
+            CombineRules = CombineRules.ToList(),
+            MonitoredTracons = MonitoredTracons.ToList()
         };
 
         var json = System.Text.Json.JsonSerializer.Serialize(settings,
@@ -474,6 +568,11 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
                 _thresholds = settings.Thresholds
                     .ToDictionary(t => t.Identifier);
                 CombineRules = settings.CombineRules ?? new();
+
+                MonitoredTracons.Clear();
+                foreach (var tc in settings.MonitoredTracons ?? new())
+                    MonitoredTracons.Add(tc);
+
                 OnPropertyChanged(nameof(Rows));
                 OnPropertyChanged(nameof(SectorCounts));
             }
