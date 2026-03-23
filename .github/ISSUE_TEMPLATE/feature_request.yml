@@ -1,0 +1,63 @@
+name: Feature Request
+description: Suggest a new feature or improvement for vTFMS
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Feature Area
+      description: Which part of vTFMS does this relate to?
+      options:
+        - Radar Display
+        - Flight Tracking / Filters
+        - Map Overlays (boundaries, airports, navaids)
+        - Weather
+        - FEA/FCA
+        - Panels / UI
+        - Performance
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the feature
+      description: A clear description of what you'd like to see added or changed
+      placeholder: Tell us what you have in mind
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: Why would this be useful? What problem does it solve?
+      placeholder: Explain the scenario where you'd use this
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you considered any workarounds or alternative approaches?
+      placeholder: Describe any alternatives you've thought of
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Mockups or references
+      description: If applicable, add screenshots, mockups, or links to similar features in other tools
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Any other details that might help
+    validations:
+      required: false
