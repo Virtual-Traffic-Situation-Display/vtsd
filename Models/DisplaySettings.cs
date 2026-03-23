@@ -18,6 +18,7 @@ public class DisplaySettings
     public double MapLabelFontSize { get; set; } = 9;
     public string DataBlockColor { get; set; } = "#00CCFF";
     public string MapLabelColor { get; set; } = "#00CCFF";
+    public string DisabledColor { get; set; } = "#808080";
 
     public DisplaySettings Clone() => new()
     {
@@ -36,6 +37,7 @@ public class DisplaySettings
         MapLabelFont = MapLabelFont,
         MapLabelFontSize = MapLabelFontSize,
         DataBlockColor = DataBlockColor,
-        MapLabelColor = MapLabelColor
+        MapLabelColor = MapLabelColor,
+        DisabledColor = DisabledColor
     };
 }

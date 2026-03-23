@@ -103,10 +103,12 @@
                   Command="{Binding OpenOverlaysCommand}"/>
         <MenuItem Header="Runway Layout..."
                   FontFamily="Arial" FontSize="12"
-                  Command="{Binding OpenRunwayLayoutCommand}"/>
+                  Command="{Binding OpenRunwayLayoutCommand}"
+                  IsEnabled="False"/>
         <MenuItem Header="DME..."
                   FontFamily="Arial" FontSize="12"
-                  Command="{Binding OpenDmeCommand}"/>
+                  Command="{Binding OpenDmeCommand}"
+                  IsEnabled="False"/>
         <MenuItem Header="Projection..."
                   FontFamily="Arial" FontSize="12"
                   Command="{Binding OpenProjectionCommand}"

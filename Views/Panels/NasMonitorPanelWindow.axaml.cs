@@ -21,6 +21,7 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
     private bool _sectorViewActive = false;
     private string? _selectedArtcc = null;
     private bool _hideBaselines = false;
+    private bool _hideTracons = false;
 
     public NasMonitorPanelWindow()
     {
@@ -44,9 +45,15 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
             artccSelector.ItemsSource = artccs;
             if (artccs.Count > 0)
                 artccSelector.SelectedIndex = 0;
+            artccSelector.IsVisible = false; // ADD THIS
         }
 
+        var sectorToolbarInit = this.FindControl<StackPanel>("SectorToolbar");
+        if (sectorToolbarInit != null) sectorToolbarInit.IsVisible = false; // ADD THIS
+
         DataScroll.ScrollChanged += (_, e) =>
+
+                DataScroll.ScrollChanged += (_, e) =>
             HeaderScroll.Offset = new Avalonia.Vector(
                 DataScroll.Offset.X, HeaderScroll.Offset.Y);
 
@@ -82,15 +89,20 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
     }
 
     private void SummaryView_Checked(object? sender,
-        Avalonia.Interactivity.RoutedEventArgs e)
+    Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (sender is RadioButton rb && rb.IsChecked != true) return;
+
         _sectorViewActive = false;
 
         var artccSelector = this.FindControl<ComboBox>("ArtccSelector");
         if (artccSelector != null) artccSelector.IsVisible = false;
 
-        var sectorToolbar = this.FindControl<StackPanel>("SectorToolbar");
-        if (sectorToolbar != null) sectorToolbar.IsVisible = false;
+        var combineBtn = this.FindControl<Button>("CombineSectorsBtn");
+        if (combineBtn != null) combineBtn.IsEnabled = false;
+
+        var baselinesBtn = this.FindControl<Button>("HideBaselinesBtn");
+        if (baselinesBtn != null) baselinesBtn.IsEnabled = false;
 
         RebuildTable();
     }
@@ -98,6 +110,8 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
     private void SectorView_Checked(object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (sender is RadioButton rb && rb.IsChecked != true) return;
+
         _sectorViewActive = true;
 
         var artccSelector = this.FindControl<ComboBox>("ArtccSelector");
@@ -107,8 +121,11 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
             _selectedArtcc = artccSelector.SelectedItem as string;
         }
 
-        var sectorToolbar = this.FindControl<StackPanel>("SectorToolbar");
-        if (sectorToolbar != null) sectorToolbar.IsVisible = true;
+        var combineBtn = this.FindControl<Button>("CombineSectorsBtn");
+        if (combineBtn != null) combineBtn.IsEnabled = true;
+
+        var baselinesBtn = this.FindControl<Button>("HideBaselinesBtn");
+        if (baselinesBtn != null) baselinesBtn.IsEnabled = true;
 
         RebuildTable();
     }
@@ -160,11 +177,28 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
         RebuildTable();
     }
 
+    private void HideTracons_Click(object? sender,
+    Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _hideTracons = !_hideTracons;
+
+        if (sender is Button btn)
+            btn.Content = _hideTracons
+                ? "Show All TRACONs"
+                : "Hide All TRACONs";
+
+        RebuildTable();
+    }
+
     private void RebuildTable()
     {
         _rebuildDebounce?.Cancel();
         _rebuildDebounce = new CancellationTokenSource();
         var token = _rebuildDebounce.Token;
+
+        // Capture state NOW before the async delay
+        bool sectorView = _sectorViewActive;
+        string? selectedArtcc = _selectedArtcc;
 
         Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
         {
@@ -172,18 +206,14 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
             {
                 await Task.Delay(200, token);
                 if (token.IsCancellationRequested) return;
-                DoRebuildTable();
+
+                if (sectorView && !string.IsNullOrEmpty(selectedArtcc))
+                    DoRebuildSectorTable(selectedArtcc);
+                else
+                    DoRebuildSummaryTable();
             }
             catch (OperationCanceledException) { }
         });
-    }
-
-    private void DoRebuildTable()
-    {
-        if (_sectorViewActive && !string.IsNullOrEmpty(_selectedArtcc))
-            DoRebuildSectorTable();
-        else
-            DoRebuildSummaryTable();
     }
 
     private void DoRebuildSummaryTable()
@@ -239,7 +269,6 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
             rowGrid.Children.Add(centerBorder);
 
             var threshold = _vm.GetThreshold(row.CenterId);
-
             int capturedArtcc = _vm.Rows.IndexOf(row);
 
             for (int i = 0; i < colCount && i < row.Cells.Count; i++)
@@ -276,83 +305,81 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
             rows.Add(rowGrid);
         }
 
-        // TRACON rows
-        foreach (var config in _vm.MonitoredTracons)
+        // TRACON rows — hidden if _hideTracons is true
+        if (!_hideTracons)
         {
-            var rowGrid = new Grid
+            foreach (var config in _vm.MonitoredTracons)
             {
-                ColumnDefinitions = new ColumnDefinitions(colDefs)
-            };
-
-            var labelCell = MakeCell(
-                config.Identifier, 0, false, "#006699", "#ffffff");
-
-            // Double-tap to set threshold
-            labelCell.DoubleTapped += (_, _) =>
-            {
-                var threshold = _vm.GetThreshold(config.Identifier);
-                var popup = new ArtccThresholdWindow(
-                    config.Identifier,
-                    threshold.YellowAt,
-                    threshold.RedAt);
-
-                popup.ThresholdSet += (_, t) =>
+                var rowGrid = new Grid
                 {
-                    _vm.SetThreshold(config.Identifier, t.yellow, t.red);
-                    RebuildTable();
+                    ColumnDefinitions = new ColumnDefinitions(colDefs)
                 };
 
-                popup.ShowDialog(this);
-            };
+                var labelCell = MakeCell(
+                    config.Identifier, 0, false, "#006699", "#ffffff");
 
-            // Right-click to remove
-            labelCell.PointerReleased += (_, e) =>
-            {
-                if (e.InitialPressMouseButton ==
-                    Avalonia.Input.MouseButton.Right)
+                labelCell.DoubleTapped += (_, _) =>
                 {
-                    _vm.RemoveTraconCommand.Execute(config);
-                    RebuildTable();
+                    var threshold = _vm.GetThreshold(config.Identifier);
+                    var popup = new ArtccThresholdWindow(
+                        config.Identifier,
+                        threshold.YellowAt,
+                        threshold.RedAt);
+
+                    popup.ThresholdSet += (_, t) =>
+                    {
+                        _vm.SetThreshold(config.Identifier, t.yellow, t.red);
+                        RebuildTable();
+                    };
+
+                    popup.ShowDialog(this);
+                };
+
+                labelCell.PointerReleased += (_, e) =>
+                {
+                    if (e.InitialPressMouseButton ==
+                        Avalonia.Input.MouseButton.Right)
+                    {
+                        _vm.RemoveTraconCommand.Execute(config);
+                        RebuildTable();
+                    }
+                };
+
+                rowGrid.Children.Add(labelCell);
+
+                var traconThreshold = _vm.GetThreshold(config.Identifier);
+                for (int i = 0; i < colCount; i++)
+                {
+                    _vm.TraconCounts.TryGetValue(
+                        config.Identifier, out var counts);
+                    int count = _vm.IsEnabled
+                        ? (counts != null ? counts[i] : 0)
+                        : -1;
+                    var (bg, fg, text) = GetCellStyle(
+                        count, _vm.IsEnabled,
+                        traconThreshold.YellowAt,
+                        traconThreshold.RedAt);
+                    rowGrid.Children.Add(MakeCell(text, i + 1, false, bg, fg));
                 }
-            };
 
-            rowGrid.Children.Add(labelCell);
-
-            var threshold = _vm.GetThreshold(config.Identifier);
-
-            for (int i = 0; i < colCount; i++)
-            {
-                _vm.TraconCounts.TryGetValue(
-                    config.Identifier, out var counts);
-                int count = _vm.IsEnabled
-                    ? (counts != null ? counts[i] : 0)
-                    : -1;
-                var (bg, fg, text) = GetCellStyle(
-                    count, _vm.IsEnabled,
-                    threshold.YellowAt,
-                    threshold.RedAt);
-                rowGrid.Children.Add(MakeCell(text, i + 1, false, bg, fg));
+                rows.Add(rowGrid);
             }
-
-            rows.Add(rowGrid);
         }
 
         dataRows.ItemsSource = rows;
     }
 
-    private void DoRebuildSectorTable()
+    private void DoRebuildSectorTable(string selectedArtcc)
     {
         var headerRow = this.FindControl<ItemsControl>("HeaderRow");
         var dataRows = this.FindControl<ItemsControl>("DataRows");
         if (headerRow == null || dataRows == null) return;
-        if (string.IsNullOrEmpty(_selectedArtcc)) return;
 
-        var sectors = _mapDataService.GetSectorsForArtcc(_selectedArtcc);
+        var sectors = _mapDataService.GetSectorsForArtcc(selectedArtcc);
         int colCount = _vm.TimeLabels.Count;
         string colDefs = "60," +
             string.Join(",", Enumerable.Repeat("50", colCount));
 
-        // Header row
         var headerGrid = new Grid
         {
             ColumnDefinitions = new ColumnDefinitions(colDefs)
@@ -376,7 +403,8 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
             _vm.CombineRules.SelectMany(r => r.Children),
             StringComparer.OrdinalIgnoreCase);
 
-        var orderedRows = new List<(string sectorNum, bool isCombinedRow, bool isChild)>();
+        var orderedRows = new List<(string sectorNum, bool isCombinedRow,
+            bool isChild)>();
         var placed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var sectorGroup in uniqueSectors)
@@ -414,7 +442,7 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
         }
 
         var rows = new List<Control>();
-        string artcc = _selectedArtcc!;
+        string artcc = selectedArtcc;
 
         foreach (var (sectorNum, isCombinedRow, isChild) in orderedRows)
         {
@@ -461,7 +489,8 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
                     ColumnDefinitions = new ColumnDefinitions(colDefs)
                 };
                 rowGrid.Children.Add(
-                    MakeCell(isChild ? $"({sectorNum})" : sectorNum, 0, false, rowBg, rowFg));
+                    MakeCell(isChild ? $"({sectorNum})" : sectorNum,
+                        0, false, rowBg, rowFg));
 
                 for (int i = 0; i < colCount; i++)
                 {
@@ -487,6 +516,67 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
                         rowGrid.Children.Add(
                             MakeCell(text, i + 1, false, bg, fg));
                     }
+                }
+
+                rows.Add(rowGrid);
+            }
+        }
+
+        // TRACON rows — hidden if _hideTracons is true
+        if (!_hideTracons)
+        {
+            foreach (var config in _vm.MonitoredTracons)
+            {
+                var rowGrid = new Grid
+                {
+                    ColumnDefinitions = new ColumnDefinitions(colDefs)
+                };
+
+                var labelCell = MakeCell(
+                    config.Identifier, 0, false, "#006699", "#ffffff");
+
+                labelCell.DoubleTapped += (_, _) =>
+                {
+                    var threshold = _vm.GetThreshold(config.Identifier);
+                    var popup = new ArtccThresholdWindow(
+                        config.Identifier,
+                        threshold.YellowAt,
+                        threshold.RedAt);
+
+                    popup.ThresholdSet += (_, t) =>
+                    {
+                        _vm.SetThreshold(config.Identifier, t.yellow, t.red);
+                        RebuildTable();
+                    };
+
+                    popup.ShowDialog(this);
+                };
+
+                labelCell.PointerReleased += (_, e) =>
+                {
+                    if (e.InitialPressMouseButton ==
+                        Avalonia.Input.MouseButton.Right)
+                    {
+                        _vm.RemoveTraconCommand.Execute(config);
+                        RebuildTable();
+                    }
+                };
+
+                rowGrid.Children.Add(labelCell);
+
+                var traconThreshold = _vm.GetThreshold(config.Identifier);
+                for (int i = 0; i < colCount; i++)
+                {
+                    _vm.TraconCounts.TryGetValue(
+                        config.Identifier, out var counts);
+                    int count = _vm.IsEnabled
+                        ? (counts != null ? counts[i] : 0)
+                        : -1;
+                    var (bg, fg, text) = GetCellStyle(
+                        count, _vm.IsEnabled,
+                        traconThreshold.YellowAt,
+                        traconThreshold.RedAt);
+                    rowGrid.Children.Add(MakeCell(text, i + 1, false, bg, fg));
                 }
 
                 rows.Add(rowGrid);
