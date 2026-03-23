@@ -94,20 +94,25 @@
                 SelectionChanged="ArtccSelector_SelectionChanged"/>
     </StackPanel>
 
-    <!-- Row 2: Sector toolbar — only visible in sector view -->
+    <!-- Row 2: Action toolbar — Combine and Baselines disabled in summary -->
     <StackPanel Grid.Row="2"
-                x:Name="SectorToolbar"
                 Orientation="Horizontal"
                 Margin="4,0,4,4"
-                Spacing="8"
-                IsVisible="False">
-      <Button Content="Combine Sectors"
+                Spacing="8">
+      <Button x:Name="CombineSectorsBtn"
+              Content="Combine Sectors"
               FontFamily="Arial" FontSize="11"
+              IsEnabled="False"
               Click="CombineSectors_Click"/>
       <Button x:Name="HideBaselinesBtn"
               Content="Hide All Baselines"
               FontFamily="Arial" FontSize="11"
+              IsEnabled="False"
               Click="HideBaselines_Click"/>
+      <Button x:Name="HideTRACONsBtn"
+              Content="Hide All TRACONs"
+              FontFamily="Arial" FontSize="11"
+              Click="HideTracons_Click"/>
     </StackPanel>
 
     <!-- Row 3: TRACON monitor input -->

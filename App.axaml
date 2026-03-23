@@ -11,9 +11,53 @@
     </Application.DataTemplates>
   
     <Application.Styles>
-        <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml"/>
-        <FluentTheme />
-    </Application.Styles>
+    <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml"/>
+    <FluentTheme />
+    <Style Selector="Button:disabled /template/ ContentPresenter">
+        <Setter Property="Opacity" Value="0.6"/>
+        <Setter Property="Foreground" Value="#040403"/>
+    </Style>
+    <Style Selector="TextBlock:disabled">
+        <Setter Property="Opacity" Value="0.5"/>
+        <Setter Property="Foreground" Value="#040403"/>
+    </Style>
+    <Style Selector="MenuItem:disabled /template/ ContentPresenter">
+        <Setter Property="Opacity" Value="0.6"/>
+        <Setter Property="Foreground" Value="#040403"/>
+    </Style>
+    <Style Selector="Label">
+        <Setter Property="Foreground" Value="#040403"/>
+    </Style>
+    <Style Selector="RadioButton">
+        <Setter Property="Foreground" Value="#040403"/>
+    </Style>
+    <Style Selector="RadioButton:disabled /template/ ContentPresenter">
+        <Setter Property="Opacity" Value="0.6"/>
+        <Setter Property="Foreground" Value="#040403"/>
+    </Style>
+    <Style Selector="ComboBox /template/ ContentPresenter">
+        <Setter Property="Foreground" Value="#040403"/>
+    </Style>
+    <Style Selector="ComboBoxItem">
+        <Setter Property="Foreground" Value="#040403"/>
+    </Style>
+    <Style Selector="SplitButton /template/ ContentPresenter">
+        <Setter Property="Foreground" Value="#040403"/>
+    </Style>
+    <Style Selector="SplitButton:disabled /template/ ContentPresenter">
+        <Setter Property="Opacity" Value="0.6"/>
+        <Setter Property="Foreground" Value="#040403"/>
+    </Style>
+        <Style Selector="SplitButton /template/ Button /template/ ContentPresenter">
+        <Setter Property="Foreground" Value="#040403"/>
+    </Style>
+    <Style Selector="SplitButton /template/ Button#PART_PrimaryButton /template/ ContentPresenter">
+        <Setter Property="Foreground" Value="#040403"/>
+    </Style>
+    <Style Selector="TextBox:focus">
+        <Setter Property="Background" Value="White"/>
+    </Style>
+</Application.Styles>
 
     <Application.Resources>
         <ResourceDictionary>
