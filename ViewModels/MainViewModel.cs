@@ -117,7 +117,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void OpenMoveZoom() =>
-        _panelManager.Open<MoveZoomPanelWindow>();
+        _panelManager.OpenWithArgs(
+            new MoveZoomPanelWindow(TsdViewModel));
 
     [RelayCommand]
     private void OpenShowMapItem() =>
@@ -130,8 +131,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void OpenOverlays() =>
-    _panelManager.OpenWithArgs(
-        new OverlaysPanelWindow(TsdViewModel));
+        _panelManager.OpenWithArgs(
+            new OverlaysPanelWindow(TsdViewModel));
 
     [RelayCommand]
     private void OpenRunwayLayout() =>
