@@ -16,12 +16,12 @@ public static class RouteProjector
             pilot.ParsedRoute.Count < 2)
             return null;
 
-        if (pilot.GroundSpeed <= 0)
+        if (pilot.AverageSpeed <= 0)
             return null;
 
         // Distance to travel in nautical miles
         double distanceNm =
-            pilot.GroundSpeed * minutesAhead / 60.0;
+            pilot.AverageSpeed * minutesAhead / 60.0;
 
         // Find the segment the aircraft is currently on
         int segmentIndex = FindCurrentSegment(

@@ -1,0 +1,74 @@
+<panels:BasePanelWindow
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:panels="using:vTFMS.Views.Panels"
+    xmlns:vm="using:vTFMS.ViewModels.Panels"
+    x:Class="vTFMS.Views.Panels.AltitudeFilterPanelWindow"
+    x:DataType="vm:AltitudeFilterPanelViewModel"
+    Width="300" Height="220"
+    RequestedThemeVariant="Light">
+
+  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="12">
+
+    <!-- Enable toggle -->
+    <CheckBox Grid.Row="0"
+              Content="Enable Altitude Filter"
+              IsChecked="{Binding Enabled}"
+              FontFamily="Arial" FontSize="11"
+              Margin="0,0,0,12"/>
+
+    <!-- Floor -->
+    <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto"
+          Margin="0,0,0,6">
+      <TextBlock Grid.Column="0"
+                 Text="Floor:"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center" Margin="0,0,8,0"/>
+      <TextBox Grid.Column="1"
+               Text="{Binding Floor}"
+               FontFamily="Arial" FontSize="11"
+               Height="26"/>
+      <TextBlock Grid.Column="2"
+                 Text="ft"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center" Margin="6,0,0,0"/>
+    </Grid>
+
+    <!-- Ceiling -->
+    <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto"
+          Margin="0,0,0,8">
+      <TextBlock Grid.Column="0"
+                 Text="Ceiling:"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center" Margin="0,0,8,0"/>
+      <TextBox Grid.Column="1"
+               Text="{Binding Ceiling}"
+               FontFamily="Arial" FontSize="11"
+               Height="26"/>
+      <TextBlock Grid.Column="2"
+                 Text="ft"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center" Margin="6,0,0,0"/>
+    </Grid>
+
+    <!-- Buttons -->
+    <StackPanel Grid.Row="4"
+                Orientation="Horizontal"
+                HorizontalAlignment="Center">
+      <Button Content="OK"
+              Command="{Binding OkCommand}"
+              FontFamily="Arial" FontSize="11"
+              MinWidth="60" Margin="4"/>
+      <Button Content="Apply"
+              Command="{Binding ApplyCommand}"
+              FontFamily="Arial" FontSize="11"
+              MinWidth="60" Margin="4"/>
+      <Button Content="Cancel"
+              Command="{Binding CancelCommand}"
+              FontFamily="Arial" FontSize="11"
+              MinWidth="60" Margin="4"/>
+    </StackPanel>
+
+  </Grid>
+
+</panels:BasePanelWindow>

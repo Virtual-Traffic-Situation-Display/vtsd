@@ -55,11 +55,13 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
                 HeaderScroll.Offset.X, DataScroll.Offset.Y);
 
         _vm.Rows.CollectionChanged += (_, _) => RebuildTable();
+        _vm.MonitoredTracons.CollectionChanged += (_, _) => RebuildTable();
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(_vm.TimeLabels) ||
                 e.PropertyName == nameof(_vm.Rows) ||
-                e.PropertyName == nameof(_vm.SectorCounts))
+                e.PropertyName == nameof(_vm.SectorCounts) ||
+                e.PropertyName == nameof(_vm.TraconCounts))
                 RebuildTable();
         };
 
@@ -236,19 +238,20 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
 
             rowGrid.Children.Add(centerBorder);
 
-            var artccThreshold = _vm.GetThreshold(row.CenterId);
-            int artccIndex = _vm.Rows.IndexOf(row);
-            for (int i = 0; i < row.Cells.Count && i < colCount; i++)
+            var threshold = _vm.GetThreshold(row.CenterId);
+
+            int capturedArtcc = _vm.Rows.IndexOf(row);
+
+            for (int i = 0; i < colCount && i < row.Cells.Count; i++)
             {
-                var cell = row.Cells[i];
+                int count = _vm.IsEnabled ? row.Cells[i].Count : -1;
                 var (bg, fg, text) = GetCellStyle(
-                    cell.Count, _vm.IsEnabled,
-                    artccThreshold.YellowAt,
-                    artccThreshold.RedAt);
+                    count, _vm.IsEnabled,
+                    threshold.YellowAt,
+                    threshold.RedAt);
 
                 var cellBorder = MakeCell(text, i + 1, false, bg, fg);
 
-                int capturedArtcc = artccIndex;
                 int capturedCol = i;
                 string capturedCenter = row.CenterId;
                 string capturedLabel = i < _vm.TimeLabels.Count
@@ -268,6 +271,67 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
                 };
 
                 rowGrid.Children.Add(cellBorder);
+            }
+
+            rows.Add(rowGrid);
+        }
+
+        // TRACON rows
+        foreach (var config in _vm.MonitoredTracons)
+        {
+            var rowGrid = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions(colDefs)
+            };
+
+            var labelCell = MakeCell(
+                config.Identifier, 0, false, "#006699", "#ffffff");
+
+            // Double-tap to set threshold
+            labelCell.DoubleTapped += (_, _) =>
+            {
+                var threshold = _vm.GetThreshold(config.Identifier);
+                var popup = new ArtccThresholdWindow(
+                    config.Identifier,
+                    threshold.YellowAt,
+                    threshold.RedAt);
+
+                popup.ThresholdSet += (_, t) =>
+                {
+                    _vm.SetThreshold(config.Identifier, t.yellow, t.red);
+                    RebuildTable();
+                };
+
+                popup.ShowDialog(this);
+            };
+
+            // Right-click to remove
+            labelCell.PointerReleased += (_, e) =>
+            {
+                if (e.InitialPressMouseButton ==
+                    Avalonia.Input.MouseButton.Right)
+                {
+                    _vm.RemoveTraconCommand.Execute(config);
+                    RebuildTable();
+                }
+            };
+
+            rowGrid.Children.Add(labelCell);
+
+            var threshold = _vm.GetThreshold(config.Identifier);
+
+            for (int i = 0; i < colCount; i++)
+            {
+                _vm.TraconCounts.TryGetValue(
+                    config.Identifier, out var counts);
+                int count = _vm.IsEnabled
+                    ? (counts != null ? counts[i] : 0)
+                    : -1;
+                var (bg, fg, text) = GetCellStyle(
+                    count, _vm.IsEnabled,
+                    threshold.YellowAt,
+                    threshold.RedAt);
+                rowGrid.Children.Add(MakeCell(text, i + 1, false, bg, fg));
             }
 
             rows.Add(rowGrid);
@@ -312,9 +376,6 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
             _vm.CombineRules.SelectMany(r => r.Children),
             StringComparer.OrdinalIgnoreCase);
 
-        // Build ordered rows:
-        // isCombinedRow = blue summary row
-        // isChild = gray child row
         var orderedRows = new List<(string sectorNum, bool isCombinedRow, bool isChild)>();
         var placed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -326,16 +387,13 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
             bool isParent = parentSectors.Contains(sectorNum);
             bool isChild = childSectors.Contains(sectorNum);
 
-            // Pure children get placed under their parent
             if (isChild && !isParent) continue;
 
             if (isParent)
             {
-                // 1. Blue combined row only — no separate parent row
                 orderedRows.Add((sectorNum, true, false));
                 placed.Add(sectorNum);
 
-                // 2. Children immediately after — gray with parentheses
                 var rule = _vm.CombineRules.FirstOrDefault(r =>
                     r.Parent.Equals(sectorNum,
                         StringComparison.OrdinalIgnoreCase));
@@ -364,7 +422,6 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
 
             if (isCombinedRow)
             {
-                // Blue combined row — sum of parent + all children
                 string combinedKey = $"{artcc}-{sectorNum}+".ToUpperInvariant();
                 _vm.SectorCounts.TryGetValue(combinedKey, out var combinedCounts);
                 var threshold = _vm.GetThreshold(combinedKey);
@@ -392,7 +449,6 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
             }
             else
             {
-                // Normal row or gray child row
                 string sectorKey = $"{artcc}-{sectorNum}".ToUpperInvariant();
                 _vm.SectorCounts.TryGetValue(sectorKey, out var counts);
                 var threshold = _vm.GetThreshold(sectorKey);
@@ -415,7 +471,6 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
 
                     if (isChild)
                     {
-                        // Gray cells but still show counts
                         var (_, _, text) = GetCellStyle(
                             count, _vm.IsEnabled,
                             threshold.YellowAt,

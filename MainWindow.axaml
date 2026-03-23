@@ -125,6 +125,9 @@
                     Command="{Binding ToggleShowAllAircraftCommand}"
                     Icon="{Binding ShowAllAircraft,
                            Converter={StaticResource BoolToCheckConverter}}"/>
+          <MenuItem Header="Altitude Filter..."
+                    FontFamily="Arial" FontSize="12"
+                    Command="{Binding OpenAltitudeFilterCommand}"/>
           <MenuItem Header="Select Flights..."
                     FontFamily="Arial" FontSize="12"
                     Command="{Binding OpenSelectFlightsCommand}"/>

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace vTFMS.Models;
 
@@ -18,4 +19,30 @@ public class VatsimPilot
     public bool MatchedDrawRoute { get; set; } = false;
     public bool MatchedShowRoute { get; set; } = false;
     public List<LatLon> ParsedRoute { get; set; } = new();
+
+    // Speed averaging for smoother projections
+    private readonly Queue<int> _speedHistory = new();
+    private const int MaxSpeedSamples = 5;
+
+    public int AverageSpeed => _speedHistory.Count > 0
+        ? (int)_speedHistory.Average()
+        : GroundSpeed;
+
+    public void RecordSpeed(int speed)
+    {
+        // Reject abrupt outliers (>50% change from average)
+        if (_speedHistory.Count >= 2)
+        {
+            double avg = _speedHistory.Average();
+            if (avg > 0 && System.Math.Abs(speed - avg) > avg * 0.5)
+            {
+                // Dampen: use midpoint between outlier and average
+                speed = (int)((speed + avg) / 2);
+            }
+        }
+
+        _speedHistory.Enqueue(speed);
+        if (_speedHistory.Count > MaxSpeedSamples)
+            _speedHistory.Dequeue();
+    }
 }

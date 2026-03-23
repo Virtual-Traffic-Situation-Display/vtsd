@@ -7,7 +7,7 @@
     x:DataType="vm:NasMonitorPanelViewModel"
     Width="600" Height="400"
     MinWidth="300" MinHeight="200">
-  <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Margin="4">
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*" Margin="4">
 
     <!-- Row 0: Top toolbar — Enable/Disable and horizon slider -->
     <Grid Grid.Row="0"
@@ -80,13 +80,13 @@
                    IsChecked="True"
                    GroupName="ViewMode"
                    VerticalAlignment="Center"
-                   Checked="SummaryView_Checked"/>
+                   IsCheckedChanged="SummaryView_Checked"/>
       <RadioButton x:Name="SectorViewRadio"
                    Content="Sector"
                    FontFamily="Arial" FontSize="11"
                    GroupName="ViewMode"
                    VerticalAlignment="Center"
-                   Checked="SectorView_Checked"/>
+                   IsCheckedChanged="SectorView_Checked"/>
       <ComboBox x:Name="ArtccSelector"
                 FontFamily="Arial" FontSize="11"
                 Width="80"
@@ -110,8 +110,33 @@
               Click="HideBaselines_Click"/>
     </StackPanel>
 
-    <!-- Row 3: Column headers -->
-    <ScrollViewer Grid.Row="3"
+    <!-- Row 3: TRACON monitor input -->
+    <StackPanel Grid.Row="3"
+                Orientation="Horizontal"
+                Margin="4,0,4,4"
+                Spacing="4">
+      <TextBlock Text="TRACON:"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center"/>
+      <TextBox Text="{Binding TraconIdentifier}"
+               FontFamily="Arial" FontSize="11"
+               Width="80" Height="24"/>
+      <TextBlock Text="Ceiling:"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center"/>
+      <TextBox Text="{Binding TraconAltitude}"
+               FontFamily="Arial" FontSize="11"
+               Width="60" Height="24"/>
+      <TextBlock Text="ft"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center"/>
+      <Button Content="Add"
+              Command="{Binding AddTraconCommand}"
+              FontFamily="Arial" FontSize="11"/>
+    </StackPanel>
+
+    <!-- Row 4: Column headers -->
+    <ScrollViewer Grid.Row="4"
                   HorizontalScrollBarVisibility="Hidden"
                   VerticalScrollBarVisibility="Disabled"
                   x:Name="HeaderScroll">
@@ -121,8 +146,8 @@
                     FontWeight="Bold"/>
     </ScrollViewer>
 
-    <!-- Row 4: Data rows -->
-    <ScrollViewer Grid.Row="4"
+    <!-- Row 5: Data rows -->
+    <ScrollViewer Grid.Row="5"
                   HorizontalScrollBarVisibility="Auto"
                   VerticalScrollBarVisibility="Auto"
                   x:Name="DataScroll">
