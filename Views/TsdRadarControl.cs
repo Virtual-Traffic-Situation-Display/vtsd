@@ -997,7 +997,8 @@ public class TsdRadarControl : Control
         foreach (var item in ActiveMapItems)
         {
             var pt = LatLonToScreen(item.Lat, item.Lon, width, height);
-            if (item.Type != "Airway" && !IsOnScreen(pt, width, height)) continue;
+            if (item.Type != "Airway" && item.Type != "Sector" &&
+                !IsOnScreen(pt, width, height)) continue;
 
             switch (item.Type)
             {
@@ -1083,6 +1084,63 @@ public class TsdRadarControl : Control
 
                 case "TRACON":
                     DrawTraconBoundary(context, item, width, height);
+                    break;
+
+                case "Sector":
+                    foreach (var ring in item.Rings)
+                    {
+                        if (ring.Count < 2) continue;
+
+                        var sectorGeo = new StreamGeometry();
+                        using (var ctx = sectorGeo.Open())
+                        {
+                            var first = LatLonToScreen(
+                                ring[0].Lat, ring[0].Lon, width, height);
+                            ctx.BeginFigure(first, false);
+                            for (int i = 1; i < ring.Count; i++)
+                            {
+                                ctx.LineTo(LatLonToScreen(
+                                    ring[i].Lat, ring[i].Lon, width, height));
+                            }
+                            ctx.EndFigure(true);
+                        }
+                        context.DrawGeometry(null, _sectorPen, sectorGeo);
+                    }
+
+                    // Two-line label at centroid
+                    // Two-line label at centroid of each ring individually
+                    foreach (var labelRing in item.Rings)
+                    {
+                        if (labelRing.Count == 0) continue;
+
+                        double sLat = labelRing.Average(p => p.Lat);
+                        double sLon = labelRing.Average(p => p.Lon);
+                        var center = LatLonToScreen(sLat, sLon, width, height);
+
+                        if (!IsOnScreen(center, width, height)) continue;
+
+                        var idLabel = new FormattedText(
+                            item.Identifier,
+                            System.Globalization.CultureInfo.CurrentCulture,
+                            FlowDirection.LeftToRight,
+                            _mapLabelTypeface, 9, _mapLabelBrush);
+
+                        var altLabel = new FormattedText(
+                            item.Label,
+                            System.Globalization.CultureInfo.CurrentCulture,
+                            FlowDirection.LeftToRight,
+                            _mapLabelTypeface, 9, _mapLabelBrush);
+
+                        double totalHeight = idLabel.Height + altLabel.Height + 2;
+
+                        context.DrawText(idLabel, new Point(
+                            center.X - idLabel.Width / 2,
+                            center.Y - totalHeight / 2));
+
+                        context.DrawText(altLabel, new Point(
+                            center.X - altLabel.Width / 2,
+                            center.Y - totalHeight / 2 + idLabel.Height + 2));
+                    }
                     break;
 
                 case "Airway":

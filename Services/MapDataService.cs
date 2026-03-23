@@ -21,6 +21,13 @@ public class MapDataService : IMapDataService
     private Dictionary<string, Airway>? _airways = null;
     private readonly object _airwayLock = new();
 
+    // Sectors — loaded lazily on first request
+    // Key: "ARTCC-sector" e.g. "ZID-02"
+    // Value: list of ArtccSector (one per unique polygon/altitude range)
+    private Dictionary<string, List<ArtccSector>>? _sectors = null;
+    private List<ArtccSector>? _allSectors = null;
+    private readonly object _sectorLock = new();
+
     public MapDataService()
     {
         LoadAirports();
@@ -123,6 +130,235 @@ public class MapDataService : IMapDataService
     }
 
     // -------------------------------------------------------------------------
+    // Sectors — lazy loaded from disk on first request
+    // -------------------------------------------------------------------------
+
+    private (Dictionary<string, List<ArtccSector>> map,
+             List<ArtccSector> all) EnsureSectorsLoaded()
+    {
+        if (_sectors != null && _allSectors != null)
+            return (_sectors, _allSectors);
+
+        lock (_sectorLock)
+        {
+            if (_sectors != null && _allSectors != null)
+                return (_sectors, _allSectors);
+
+            var map = new Dictionary<string, List<ArtccSector>>(
+                StringComparer.OrdinalIgnoreCase);
+            var all = new List<ArtccSector>();
+
+            var filePath = Path.Combine(
+                AppContext.BaseDirectory, "Data", "sectors.json");
+
+            if (!File.Exists(filePath))
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    "MapDataService: sectors.json not found");
+                _sectors = map;
+                _allSectors = all;
+                return (_sectors, _allSectors);
+            }
+
+            try
+            {
+                var json = File.ReadAllText(filePath);
+                var doc = JsonDocument.Parse(json);
+                var features = doc.RootElement.GetProperty("features");
+
+                foreach (var feature in features.EnumerateArray())
+                {
+                    try
+                    {
+                        var props = feature.GetProperty("properties");
+
+                        var artcc = props.GetProperty("artcc")
+                            .GetString() ?? string.Empty;
+                        var sector = props.GetProperty("sector")
+                            .GetString() ?? string.Empty;
+                        var tier = props.GetProperty("tier")
+                            .GetString() ?? string.Empty;
+                        var baseAlt = props.GetProperty("base_alt")
+                            .GetInt32();
+                        var maxAlt = props.GetProperty("max_alt")
+                            .GetInt32();
+
+                        if (string.IsNullOrWhiteSpace(artcc) ||
+                            string.IsNullOrWhiteSpace(sector)) continue;
+
+                        var geometry = feature.GetProperty("geometry");
+                        var geomType = geometry.GetProperty("type")
+                            .GetString();
+                        var coordinates = geometry.GetProperty("coordinates");
+
+                        var rings = new List<List<LatLon>>();
+
+                        if (geomType == "Polygon")
+                        {
+                            rings.Add(ParseLineStringCoords(coordinates[0]));
+                        }
+                        else if (geomType == "MultiPolygon")
+                        {
+                            foreach (var poly in coordinates.EnumerateArray())
+                                rings.Add(ParseLineStringCoords(poly[0]));
+                        }
+                        else if (geomType == "LineString")
+                        {
+                            rings.Add(ParseLineStringCoords(coordinates));
+                        }
+
+                        if (rings.Count == 0 || rings.All(r => r.Count < 3))
+                            continue;
+
+                        var artccSector = new ArtccSector
+                        {
+                            Artcc = artcc,
+                            Sector = sector,
+                            Tier = tier,
+                            BaseAlt = baseAlt,
+                            MaxAlt = maxAlt,
+                            Rings = rings
+                        };
+
+                        artccSector.ComputeBounds();
+
+                        var key = $"{artcc}-{sector}".ToUpperInvariant();
+                        if (!map.TryGetValue(key, out var list))
+                        {
+                            list = new List<ArtccSector>();
+                            map[key] = list;
+                        }
+                        list.Add(artccSector);
+                        all.Add(artccSector);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            $"MapDataService: skipping sector — {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"MapDataService: failed to load sectors.json — {ex.Message}");
+            }
+
+            System.Diagnostics.Debug.WriteLine(
+                $"MapDataService: loaded {all.Count} sector polygons " +
+                $"across {map.Count} sector identifiers");
+
+            _sectors = map;
+            _allSectors = all;
+            return (_sectors, _allSectors);
+        }
+    }
+
+    private static List<LatLon> ParseLineStringCoords(JsonElement coords)
+    {
+        var points = new List<LatLon>();
+        foreach (var coord in coords.EnumerateArray())
+        {
+            var arr = coord.EnumerateArray().ToList();
+            if (arr.Count < 2) continue;
+            double lon = arr[0].GetDouble();
+            double lat = arr[1].GetDouble();
+            points.Add(new LatLon(lat, lon));
+        }
+        return points;
+    }
+
+    public List<ArtccSector> GetSectors(string identifier)
+    {
+        var (map, _) = EnsureSectorsLoaded();
+        map.TryGetValue(identifier.ToUpperInvariant(), out var list);
+        return list ?? new List<ArtccSector>();
+    }
+
+    public List<string> GetArtccsWithSectors()
+    {
+        var (_, all) = EnsureSectorsLoaded();
+        return all.Select(s => s.Artcc)
+                  .Distinct(StringComparer.OrdinalIgnoreCase)
+                  .OrderBy(s => s)
+                  .ToList();
+    }
+
+    public List<ArtccSector> GetSectorsForArtcc(string artcc)
+    {
+        var (_, all) = EnsureSectorsLoaded();
+        return all
+            .Where(s => s.Artcc.Equals(artcc,
+                StringComparison.OrdinalIgnoreCase))
+            .OrderBy(s => s.Sector)
+            .ToList();
+    }
+
+    public ArtccSector? FindSectorForPosition(
+        double lat, double lon, int altitudeFeet)
+    {
+        var (_, all) = EnsureSectorsLoaded();
+
+        // Pass 1 — altitude-filtered check with bounding box
+        foreach (var sector in all)
+        {
+            if (!sector.ContainsAltitude(altitudeFeet)) continue;
+            if (!sector.IsInBoundingBox(lat, lon)) continue;
+
+            foreach (var ring in sector.Rings)
+            {
+                if (IsPointInPolygon(lat, lon, ring))
+                    return sector;
+            }
+        }
+
+        // Pass 2 — fallback: ignore altitude, check all sectors
+        foreach (var sector in all)
+        {
+            if (!sector.IsInBoundingBox(lat, lon)) continue;
+
+            foreach (var ring in sector.Rings)
+            {
+                if (IsPointInPolygon(lat, lon, ring))
+                    return sector;
+            }
+        }
+
+        return null;
+    }
+
+    public int EstimateAltitude(VatsimPilot pilot, LatLon projectedPos)
+    {
+        // If no destination, assume cruise altitude
+        if (string.IsNullOrWhiteSpace(pilot.Arrival))
+            return pilot.Altitude;
+
+        var destAirport = FindAirport(pilot.Arrival);
+        if (destAirport == null)
+            return pilot.Altitude;
+
+        // Distance from projected position to destination in nm
+        double distToDestNm = RouteProjector.DistanceNm(
+            projectedPos.Lat, projectedPos.Lon,
+            destAirport.Lat, destAirport.Lon);
+
+        // Top of descent distance: (cruiseAlt / 1000) * 3 nm
+        double todDistNm = (pilot.Altitude / 1000.0) * 3.0;
+
+        if (distToDestNm >= todDistNm)
+        {
+            // Still at cruise altitude
+            return pilot.Altitude;
+        }
+        else
+        {
+            // Descending: 1000ft per 3nm
+            int estimatedAlt = (int)(distToDestNm / 3.0 * 1000.0);
+            return Math.Max(estimatedAlt, 0);
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Airways — lazy loaded from disk on first request
     // -------------------------------------------------------------------------
 
@@ -148,10 +384,6 @@ public class MapDataService : IMapDataService
                 return _airways;
             }
 
-            var lineCount = File.ReadLines(filePath).Count();
-            System.Diagnostics.Debug.WriteLine(
-                $"MapDataService: AWY_BASE.csv has {lineCount} lines");
-
             foreach (var line in File.ReadLines(filePath).Skip(1))
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
@@ -161,9 +393,9 @@ public class MapDataService : IMapDataService
 
                 try
                 {
-                    var type = fields[2].Trim();       // J, V, Q, T, A etc.
-                    var id = fields[4].Trim();          // e.g. J146
-                    var waypointString = fields[7].Trim(); // space-separated waypoints
+                    var type = fields[2].Trim();
+                    var id = fields[4].Trim();
+                    var waypointString = fields[7].Trim();
 
                     if (string.IsNullOrWhiteSpace(id) ||
                         string.IsNullOrWhiteSpace(waypointString))
@@ -190,10 +422,6 @@ public class MapDataService : IMapDataService
             System.Diagnostics.Debug.WriteLine(
                 $"MapDataService: loaded {result.Count} airways");
 
-            System.Diagnostics.Debug.WriteLine(
-    $"MapDataService: loaded {result.Count} airways, " +
-    $"sample keys: {string.Join(", ", result.Keys.Take(5))}");
-
             _airways = result;
             return _airways;
         }
@@ -217,11 +445,9 @@ public class MapDataService : IMapDataService
     {
         var airways = EnsureAirwaysLoaded();
 
-        if (!airways.TryGetValue(identifier.ToUpperInvariant(),
-            out var airway))
+        if (!airways.TryGetValue(identifier.ToUpperInvariant(), out var airway))
             return null;
 
-        // Resolve waypoints to lat/lon if not already done
         if (!airway.IsResolved)
         {
             airway.ResolvedPoints = airway.WaypointNames
@@ -233,30 +459,8 @@ public class MapDataService : IMapDataService
         return airway;
     }
 
-    //public List<Airway> GetAllAirwaysByType(string type)
-    //{
-    //    var airways = EnsureAirwaysLoaded();
-
-    //    return airways.Values
-    //        .Where(a => a.Type.Equals(type,
-    //            StringComparison.OrdinalIgnoreCase))
-    //        .Select(a =>
-    //        {
-    //            // Ensure resolved
-    //            if (!a.IsResolved)
-    //            {
-    //                a.ResolvedPoints = a.WaypointNames
-    //                    .Select(name => ResolveWaypoint(name))
-    //                    .ToList();
-    //                a.IsResolved = true;
-    //            }
-    //            return a;
-    //        })
-    //        .ToList();
-    //}
-
     // -------------------------------------------------------------------------
-    // Route resolution — now handles airways
+    // Route resolution
     // -------------------------------------------------------------------------
 
     public List<LatLon> ResolveRoute(string departure,
@@ -278,10 +482,8 @@ public class MapDataService : IMapDataService
 
             if (token == "DCT") continue;
 
-            // Check if this token is an airway identifier
             if (IsAirwayToken(token))
             {
-                // Previous fix = entry point, next fix = exit point
                 string? entryName = i > 0 ? tokens[i - 1] : null;
                 string? exitName = i < tokens.Count - 1
                     ? tokens[i + 1] : null;
@@ -295,7 +497,6 @@ public class MapDataService : IMapDataService
                 continue;
             }
 
-            // Regular waypoint/fix/navaid/airport
             var coord = TryParseCoordWaypoint(token);
             if (coord != null) { result.Add(coord); continue; }
 
@@ -335,7 +536,6 @@ public class MapDataService : IMapDataService
 
         var names = airway.WaypointNames;
 
-        // Find entry and exit indices (case-insensitive)
         int entryIdx = names.FindIndex(n =>
             n.Equals(entryName, StringComparison.OrdinalIgnoreCase));
         int exitIdx = names.FindIndex(n =>
@@ -343,11 +543,8 @@ public class MapDataService : IMapDataService
 
         if (entryIdx < 0 || exitIdx < 0) return result;
 
-        // Determine direction
         int step = entryIdx < exitIdx ? 1 : -1;
 
-        // Walk from entry+1 to exit (inclusive) — entry point already
-        // added by the previous token's resolution
         for (int i = entryIdx + step;
             step > 0 ? i <= exitIdx : i >= exitIdx;
             i += step)
@@ -366,8 +563,6 @@ public class MapDataService : IMapDataService
         if (string.IsNullOrWhiteSpace(token)) return false;
         if (token == "DCT") return false;
 
-        // Airway identifiers: letter(s) followed by digits
-        // e.g. J146, V23, Q1, T267, A216
         int i = 0;
         while (i < token.Length && char.IsLetter(token[i])) i++;
         if (i == 0 || i >= token.Length) return false;
@@ -376,7 +571,7 @@ public class MapDataService : IMapDataService
     }
 
     // -------------------------------------------------------------------------
-    // Everything below unchanged from original
+    // GeoJSON / CSV helpers
     // -------------------------------------------------------------------------
 
     private static string? FindResource(string fileName)
@@ -760,8 +955,7 @@ public class MapDataService : IMapDataService
         }
 
         System.Diagnostics.Debug.WriteLine(
-            $"MapDataService: loaded {result.Count} " +
-            $"high altitude ARTCC boundaries");
+            $"MapDataService: loaded {result.Count} high altitude ARTCC boundaries");
 
         foreach (var b in result)
             b.ComputeBounds();

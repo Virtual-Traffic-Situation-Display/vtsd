@@ -405,6 +405,33 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                 }
             }
 
+            if (item == null)
+            {
+                var sectors = _mapDataService.GetSectors(id);
+                if (sectors.Count > 0)
+                {
+                    var allPoints = sectors
+                        .SelectMany(s => s.Rings)
+                        .SelectMany(r => r)
+                        .ToList();
+                    double avgLat = allPoints.Average(p => p.Lat);
+                    double avgLon = allPoints.Average(p => p.Lon);
+
+                    // Use first sector for label/alt info
+                    var first = sectors[0];
+
+                    item = new MapItem
+                    {
+                        Identifier = first.Label,
+                        Type = "Sector",
+                        Lat = avgLat,
+                        Lon = avgLon,
+                        Rings = sectors.SelectMany(s => s.Rings).ToList(),
+                        Label = first.AltLabel
+                    };
+                }
+            }
+
             if (item != null)
             {
                 _navDataCache[id] = item;

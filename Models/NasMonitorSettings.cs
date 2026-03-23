@@ -9,8 +9,15 @@ public class ArtccThreshold
     public int RedAt { get; set; } = 20;
 }
 
+public class SectorCombineRule
+{
+    public string Parent { get; set; } = string.Empty;
+    public List<string> Children { get; set; } = new();
+}
+
 public class NasMonitorSettings
 {
     public int HorizonMinutes { get; set; } = 60;
     public List<ArtccThreshold> Thresholds { get; set; } = new();
+    public List<SectorCombineRule> CombineRules { get; set; } = new();
 }
