@@ -80,13 +80,13 @@
                    IsChecked="True"
                    GroupName="ViewMode"
                    VerticalAlignment="Center"
-                   Checked="SummaryView_Checked"/>
+                   IsCheckedChanged="SummaryView_Checked"/>
       <RadioButton x:Name="SectorViewRadio"
                    Content="Sector"
                    FontFamily="Arial" FontSize="11"
                    GroupName="ViewMode"
                    VerticalAlignment="Center"
-                   Checked="SectorView_Checked"/>
+                   IsCheckedChanged="SectorView_Checked"/>
       <ComboBox x:Name="ArtccSelector"
                 FontFamily="Arial" FontSize="11"
                 Width="80"
