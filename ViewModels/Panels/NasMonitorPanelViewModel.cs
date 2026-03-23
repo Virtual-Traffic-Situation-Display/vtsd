@@ -12,7 +12,7 @@ namespace vTFMS.ViewModels.Panels;
 
 public class NasMonitorCell
 {
-    public int Count { get; set; } = -1; // -1 = disabled
+    public int Count { get; set; } = -1;
     public List<VatsimPilot> Pilots { get; set; } = new();
 }
 
@@ -35,6 +35,26 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
         IsEnabled ? "Disable" : "Enable";
 
     private Dictionary<string, ArtccThreshold> _thresholds = new();
+
+    // Combine rules — list of parent+children rules
+    public List<SectorCombineRule> CombineRules { get; private set; } = new();
+
+    public void SetCombineRules(List<SectorCombineRule> rules)
+    {
+        CombineRules = rules;
+        if (IsEnabled) _ = RecalculateAsync();
+        else OnPropertyChanged(nameof(SectorCounts));
+    }
+
+    // Sector counts — key: "ZJX-02", value: count per time slot
+    // Combined rows use key: "ZJX-50+" 
+    public Dictionary<string, int[]> SectorCounts { get; private set; } = new();
+
+    // ARTCC summary counts
+    public Dictionary<string, int[]> ArtccCounts { get; private set; } = new();
+
+    private Dictionary<(int, int), List<(VatsimPilot pilot, LatLon pos)>>
+        _cellDetails = new();
 
     public ArtccThreshold GetThreshold(string identifier)
     {
@@ -90,10 +110,6 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
     public ObservableCollection<NasMonitorRow> Rows { get; } = new();
     public List<string> TimeLabels { get; private set; } = new();
 
-    // Stores projected positions per pilot per time slot for detail lookup
-    // Key: (artccIndex, colIndex) → list of (pilot, projectedPos)
-    private Dictionary<(int, int), List<(VatsimPilot pilot, LatLon pos)>> _cellDetails = new();
-
     private readonly EventHandler _onPilotsRefreshed;
 
     public NasMonitorPanelViewModel(
@@ -117,9 +133,9 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
     }
 
     public List<(VatsimPilot pilot, LatLon pos)> GetCellDetails(
-        int artccIndex, int colIndex)
+        int rowIndex, int colIndex)
     {
-        if (_cellDetails.TryGetValue((artccIndex, colIndex), out var list))
+        if (_cellDetails.TryGetValue((rowIndex, colIndex), out var list))
             return list;
         return new();
     }
@@ -191,7 +207,11 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
                 cell.Pilots.Clear();
             }
         _cellDetails.Clear();
+        SectorCounts.Clear();
+        ArtccCounts.Clear();
         OnPropertyChanged(nameof(Rows));
+        OnPropertyChanged(nameof(SectorCounts));
+        OnPropertyChanged(nameof(ArtccCounts));
     }
 
     public async Task RecalculateAsync()
@@ -208,6 +228,14 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
         await _tsdViewModel.ResolveAllRoutesAsync(pilots);
 
         var artccList = _tsdViewModel.ArtccBoundaries.ToList();
+        var rules = CombineRules.ToList();
+
+        // Build lookup: child sector → parent sector
+        var childToParent = new Dictionary<string, string>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var rule in rules)
+            foreach (var child in rule.Children)
+                childToParent[child] = rule.Parent;
 
         var now = DateTime.UtcNow;
         int minutesToNext = now.Minute % 15 == 0 ? 15 : 15 - (now.Minute % 15);
@@ -226,9 +254,16 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
         int colCount = timeSlots.Count;
         int[] minutes = timeSlots.ToArray();
 
-        var (counts, details) = await Task.Run(() =>
+        var (artccCounts, sectorCounts, details) = await Task.Run(() =>
         {
-            var result = new int[artccList.Count, colCount];
+            var artccResult = new Dictionary<string, int[]>(
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var artcc in artccList)
+                artccResult[artcc.Identifier] = new int[colCount];
+
+            var sectorResult = new Dictionary<string, int[]>(
+                StringComparer.OrdinalIgnoreCase);
+
             var detailMap = new Dictionary<(int, int),
                 List<(VatsimPilot, LatLon)>>();
 
@@ -241,25 +276,67 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
                     for (int col = 0; col < colCount; col++)
                     {
                         LatLon? pos;
+                        int estimatedAlt;
+
                         if (minutes[col] == 0)
+                        {
                             pos = new LatLon(pilot.Lat, pilot.Lon);
+                            estimatedAlt = pilot.Altitude;
+                        }
                         else
+                        {
                             pos = RouteProjector.ProjectPosition(
                                 pilot, minutes[col]);
+                            if (pos == null) continue;
+                            estimatedAlt = _mapDataService.EstimateAltitude(
+                                pilot, pos);
+                        }
 
-                        if (pos == null) continue;
+                        var sector = _mapDataService.FindSectorForPosition(
+                            pos.Lat, pos.Lon, estimatedAlt);
 
-                        for (int a = 0; a < artccList.Count; a++)
+                        if (sector == null) continue;
+
+                        string artcc = sector.Artcc;
+                        string sectorNum = sector.Sector;
+
+                        // Individual sector count
+                        var individualKey = $"{artcc}-{sectorNum}";
+                        if (!sectorResult.ContainsKey(individualKey))
+                            sectorResult[individualKey] = new int[colCount];
+                        sectorResult[individualKey][col]++;
+
+                        // If this sector is a child or parent in a combine
+                        // rule, also add to the combined row key "ARTCC-50+"
+                        string effectiveParent = childToParent
+                            .TryGetValue(sectorNum, out var p) ? p : null!;
+                        bool isParent = rules.Any(r =>
+                            r.Parent.Equals(sectorNum,
+                                StringComparison.OrdinalIgnoreCase));
+
+                        if (effectiveParent != null || isParent)
                         {
-                            if (_mapDataService.IsPointInArtcc(
-                                pos.Lat, pos.Lon, artccList[a]))
-                            {
-                                result[a, col]++;
-                                var key = (a, col);
-                                if (!detailMap.ContainsKey(key))
-                                    detailMap[key] = new();
-                                detailMap[key].Add((pilot, pos));
-                            }
+                            string parentSector = effectiveParent ?? sectorNum;
+                            var combinedKey = $"{artcc}-{parentSector}+";
+                            if (!sectorResult.ContainsKey(combinedKey))
+                                sectorResult[combinedKey] = new int[colCount];
+                            sectorResult[combinedKey][col]++;
+                        }
+
+                        // ARTCC count
+                        if (artccResult.ContainsKey(artcc))
+                            artccResult[artcc][col]++;
+
+                        // Detail map
+                        int artccIdx = artccList.FindIndex(a =>
+                            a.Identifier.Equals(artcc,
+                                StringComparison.OrdinalIgnoreCase));
+                        if (artccIdx >= 0)
+                        {
+                            var key = (artccIdx, col);
+                            if (!detailMap.ContainsKey(key))
+                                detailMap[key] = new();
+                            detailMap[key].Add((pilot, pos));
                         }
                     }
                 }
@@ -271,7 +348,7 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
                 }
             }
 
-            return (result, detailMap);
+            return (artccResult, sectorResult, detailMap);
         });
 
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
@@ -283,17 +360,24 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
             }
 
             _cellDetails = details;
+            SectorCounts = sectorCounts;
+            ArtccCounts = artccCounts;
 
             for (int a = 0; a < Rows.Count && a < artccList.Count; a++)
             {
+                var counts = artccCounts.TryGetValue(
+                    artccList[a].Identifier, out var c) ? c : null;
+
                 for (int col = 0; col < colCount &&
                     col < Rows[a].Cells.Count; col++)
                 {
-                    Rows[a].Cells[col].Count = counts[a, col];
+                    Rows[a].Cells[col].Count = counts?[col] ?? 0;
                 }
             }
 
             OnPropertyChanged(nameof(Rows));
+            OnPropertyChanged(nameof(SectorCounts));
+            OnPropertyChanged(nameof(ArtccCounts));
         });
     }
 
@@ -342,11 +426,13 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
     {
         var settings = new NasMonitorSettings
         {
-            Thresholds = _thresholds.Values.ToList()
+            Thresholds = _thresholds.Values.ToList(),
+            CombineRules = CombineRules.ToList()
         };
 
         var json = System.Text.Json.JsonSerializer.Serialize(settings,
-            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            new System.Text.Json.JsonSerializerOptions
+            { WriteIndented = true });
 
         System.IO.File.WriteAllText(path, json);
     }
@@ -378,7 +464,8 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
 
         if (files.Count > 0)
         {
-            var json = System.IO.File.ReadAllText(files[0].Path.LocalPath);
+            var json = System.IO.File.ReadAllText(
+                files[0].Path.LocalPath);
             var settings = System.Text.Json.JsonSerializer
                 .Deserialize<NasMonitorSettings>(json);
 
@@ -386,7 +473,9 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
             {
                 _thresholds = settings.Thresholds
                     .ToDictionary(t => t.Identifier);
+                CombineRules = settings.CombineRules ?? new();
                 OnPropertyChanged(nameof(Rows));
+                OnPropertyChanged(nameof(SectorCounts));
             }
         }
     }

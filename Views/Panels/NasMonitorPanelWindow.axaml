@@ -7,36 +7,32 @@
     x:DataType="vm:NasMonitorPanelViewModel"
     Width="600" Height="400"
     MinWidth="300" MinHeight="200">
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Margin="4">
 
-  <Grid RowDefinitions="Auto,Auto,*" Margin="4">
-
-    <!-- Top toolbar — Enable/Disable dropdown and horizon slider -->
+    <!-- Row 0: Top toolbar — Enable/Disable and horizon slider -->
     <Grid Grid.Row="0"
           ColumnDefinitions="Auto,*,Auto,Auto"
           Margin="4,4,4,4">
-
-      <!-- Enable/Disable split button -->
       <SplitButton Grid.Column="0"
              Content="{Binding EnableButtonText}"
              Command="{Binding ToggleEnableCommand}"
              FontFamily="Arial" FontSize="11"
              Margin="0,0,8,0">
-  <SplitButton.Flyout>
-    <MenuFlyout>
-      <MenuItem Header="{Binding EnableButtonText}"
-                Command="{Binding ToggleEnableCommand}"/>
-      <Separator/>
-      <MenuItem Header="Save"
-                Command="{Binding SaveCommand}"/>
-      <MenuItem Header="Save As"
-                Command="{Binding SaveAsCommand}"/>
-      <MenuItem Header="Load"
-                Command="{Binding LoadCommand}"/>
-    </MenuFlyout>
-  </SplitButton.Flyout>
-</SplitButton>
+        <SplitButton.Flyout>
+          <MenuFlyout>
+            <MenuItem Header="{Binding EnableButtonText}"
+                      Command="{Binding ToggleEnableCommand}"/>
+            <Separator/>
+            <MenuItem Header="Save"
+                      Command="{Binding SaveCommand}"/>
+            <MenuItem Header="Save As"
+                      Command="{Binding SaveAsCommand}"/>
+            <MenuItem Header="Load"
+                      Command="{Binding LoadCommand}"/>
+          </MenuFlyout>
+        </SplitButton.Flyout>
+      </SplitButton>
 
-      <!-- Horizon slider -->
       <StackPanel Grid.Column="1"
                   Orientation="Horizontal"
                   VerticalAlignment="Center">
@@ -45,23 +41,21 @@
                    VerticalAlignment="Center"
                    Margin="0,0,6,0"/>
         <Slider x:Name="HorizonSlider"
-        Minimum="60" Maximum="480"
-        Value="{Binding HorizonMinutes}"
-        TickFrequency="15"
-        IsSnapToTickEnabled="True"
-        Width="150"
-        VerticalAlignment="Center"
-        PointerReleased="HorizonSlider_PointerReleased"/>
-
-<TextBlock Text="{Binding #HorizonSlider.Value,
-             StringFormat={}{0:0} min}"
-           FontFamily="Arial" FontSize="11"
-           VerticalAlignment="Center"
-           Margin="6,0,0,0"
-           Width="50"/>
+                Minimum="60" Maximum="480"
+                Value="{Binding HorizonMinutes}"
+                TickFrequency="15"
+                IsSnapToTickEnabled="True"
+                Width="150"
+                VerticalAlignment="Center"
+                PointerReleased="HorizonSlider_PointerReleased"/>
+        <TextBlock Text="{Binding #HorizonSlider.Value,
+                     StringFormat={}{0:0} min}"
+                   FontFamily="Arial" FontSize="11"
+                   VerticalAlignment="Center"
+                   Margin="6,0,0,0"
+                   Width="50"/>
       </StackPanel>
 
-      <!-- Resource warning -->
       <TextBlock Grid.Column="2"
                  Text="⚠ &gt;3hr: high resource usage"
                  FontFamily="Arial" FontSize="10"
@@ -70,11 +64,54 @@
                  VerticalAlignment="Center"
                  Margin="8,0,0,0"
                  IsVisible="{Binding ShowResourceWarning}"/>
-
     </Grid>
 
-    <!-- Column headers — built in code-behind since dynamic -->
-    <ScrollViewer Grid.Row="1"
+    <!-- Row 1: View selector toolbar -->
+    <StackPanel Grid.Row="1"
+                Orientation="Horizontal"
+                Margin="4,0,4,4"
+                Spacing="8">
+      <TextBlock Text="View:"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center"/>
+      <RadioButton x:Name="SummaryViewRadio"
+                   Content="Summary"
+                   FontFamily="Arial" FontSize="11"
+                   IsChecked="True"
+                   GroupName="ViewMode"
+                   VerticalAlignment="Center"
+                   Checked="SummaryView_Checked"/>
+      <RadioButton x:Name="SectorViewRadio"
+                   Content="Sector"
+                   FontFamily="Arial" FontSize="11"
+                   GroupName="ViewMode"
+                   VerticalAlignment="Center"
+                   Checked="SectorView_Checked"/>
+      <ComboBox x:Name="ArtccSelector"
+                FontFamily="Arial" FontSize="11"
+                Width="80"
+                IsVisible="False"
+                SelectionChanged="ArtccSelector_SelectionChanged"/>
+    </StackPanel>
+
+    <!-- Row 2: Sector toolbar — only visible in sector view -->
+    <StackPanel Grid.Row="2"
+                x:Name="SectorToolbar"
+                Orientation="Horizontal"
+                Margin="4,0,4,4"
+                Spacing="8"
+                IsVisible="False">
+      <Button Content="Combine Sectors"
+              FontFamily="Arial" FontSize="11"
+              Click="CombineSectors_Click"/>
+      <Button x:Name="HideBaselinesBtn"
+              Content="Hide All Baselines"
+              FontFamily="Arial" FontSize="11"
+              Click="HideBaselines_Click"/>
+    </StackPanel>
+
+    <!-- Row 3: Column headers -->
+    <ScrollViewer Grid.Row="3"
                   HorizontalScrollBarVisibility="Hidden"
                   VerticalScrollBarVisibility="Disabled"
                   x:Name="HeaderScroll">
@@ -84,8 +121,8 @@
                     FontWeight="Bold"/>
     </ScrollViewer>
 
-    <!-- Data rows -->
-    <ScrollViewer Grid.Row="2"
+    <!-- Row 4: Data rows -->
+    <ScrollViewer Grid.Row="4"
                   HorizontalScrollBarVisibility="Auto"
                   VerticalScrollBarVisibility="Auto"
                   x:Name="DataScroll">
@@ -95,5 +132,4 @@
     </ScrollViewer>
 
   </Grid>
-
 </panels:BasePanelWindow>

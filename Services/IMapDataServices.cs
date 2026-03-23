@@ -18,9 +18,14 @@ public interface IMapDataService
                           List<LatLon> polygon);
     bool IsPointInArtcc(double lat, double lon,
                         ArtccBoundary artcc);
-
-    // Airways — lazy loaded on first request
     Airway? GetAirway(string identifier);
-    //List<Airway> GetAllAirwaysByType(string type);
     LatLon? ResolveWaypoint(string identifier);
+
+    // Sectors
+    List<ArtccSector> GetSectors(string identifier); // e.g. "ZID-02"
+    List<string> GetArtccsWithSectors();
+    List<ArtccSector> GetSectorsForArtcc(string artcc);
+    ArtccSector? FindSectorForPosition(double lat, double lon,
+                                       int altitudeFeet);
+    int EstimateAltitude(VatsimPilot pilot, LatLon projectedPos);
 }

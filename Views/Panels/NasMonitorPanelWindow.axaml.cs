@@ -15,7 +15,12 @@ namespace vTFMS.Views.Panels;
 public partial class NasMonitorPanelWindow : BasePanelWindow
 {
     private readonly NasMonitorPanelViewModel _vm;
+    private readonly IMapDataService _mapDataService;
     private CancellationTokenSource? _rebuildDebounce;
+
+    private bool _sectorViewActive = false;
+    private string? _selectedArtcc = null;
+    private bool _hideBaselines = false;
 
     public NasMonitorPanelWindow()
     {
@@ -27,9 +32,19 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
         TsdViewModel tsdViewModel,
         IMapDataService mapDataService)
     {
+        _mapDataService = mapDataService;
         _vm = new NasMonitorPanelViewModel(tsdViewModel, mapDataService);
         DataContext = _vm;
         InitializeComponent();
+
+        var artccSelector = this.FindControl<ComboBox>("ArtccSelector");
+        if (artccSelector != null)
+        {
+            var artccs = _mapDataService.GetArtccsWithSectors();
+            artccSelector.ItemsSource = artccs;
+            if (artccs.Count > 0)
+                artccSelector.SelectedIndex = 0;
+        }
 
         DataScroll.ScrollChanged += (_, e) =>
             HeaderScroll.Offset = new Avalonia.Vector(
@@ -43,7 +58,8 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(_vm.TimeLabels) ||
-                e.PropertyName == nameof(_vm.Rows))
+                e.PropertyName == nameof(_vm.Rows) ||
+                e.PropertyName == nameof(_vm.SectorCounts))
                 RebuildTable();
         };
 
@@ -61,6 +77,85 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
     {
         if (sender is Slider slider)
             _vm.HorizonMinutes = (int)Math.Round(slider.Value / 15) * 15;
+    }
+
+    private void SummaryView_Checked(object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _sectorViewActive = false;
+
+        var artccSelector = this.FindControl<ComboBox>("ArtccSelector");
+        if (artccSelector != null) artccSelector.IsVisible = false;
+
+        var sectorToolbar = this.FindControl<StackPanel>("SectorToolbar");
+        if (sectorToolbar != null) sectorToolbar.IsVisible = false;
+
+        RebuildTable();
+    }
+
+    private void SectorView_Checked(object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _sectorViewActive = true;
+
+        var artccSelector = this.FindControl<ComboBox>("ArtccSelector");
+        if (artccSelector != null)
+        {
+            artccSelector.IsVisible = true;
+            _selectedArtcc = artccSelector.SelectedItem as string;
+        }
+
+        var sectorToolbar = this.FindControl<StackPanel>("SectorToolbar");
+        if (sectorToolbar != null) sectorToolbar.IsVisible = true;
+
+        RebuildTable();
+    }
+
+    private void ArtccSelector_SelectionChanged(object? sender,
+        SelectionChangedEventArgs e)
+    {
+        if (sender is ComboBox cb)
+            _selectedArtcc = cb.SelectedItem as string;
+
+        if (_sectorViewActive)
+            RebuildTable();
+    }
+
+    private void CombineSectors_Click(object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var existing = _vm.CombineRules
+            .Select(r => (r.Parent, string.Join(" ", r.Children)))
+            .ToList();
+
+        var window = new CombineSectorsWindow(existing);
+        window.RulesSet += (_, rules) =>
+        {
+            var newRules = rules.Select(r => new SectorCombineRule
+            {
+                Parent = r.parent,
+                Children = r.children
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .ToList()
+            }).ToList();
+
+            _vm.SetCombineRules(newRules);
+            RebuildTable();
+        };
+        window.ShowDialog(this);
+    }
+
+    private void HideBaselines_Click(object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _hideBaselines = !_hideBaselines;
+
+        if (sender is Button btn)
+            btn.Content = _hideBaselines
+                ? "Show All Baselines"
+                : "Hide All Baselines";
+
+        RebuildTable();
     }
 
     private void RebuildTable()
@@ -83,6 +178,14 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
 
     private void DoRebuildTable()
     {
+        if (_sectorViewActive && !string.IsNullOrEmpty(_selectedArtcc))
+            DoRebuildSectorTable();
+        else
+            DoRebuildSummaryTable();
+    }
+
+    private void DoRebuildSummaryTable()
+    {
         var headerRow = this.FindControl<ItemsControl>("HeaderRow");
         var dataRows = this.FindControl<ItemsControl>("DataRows");
         if (headerRow == null || dataRows == null) return;
@@ -91,7 +194,6 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
         string colDefs = "60," +
             string.Join(",", Enumerable.Repeat("50", colCount));
 
-        // Header row
         var headerGrid = new Grid
         {
             ColumnDefinitions = new ColumnDefinitions(colDefs)
@@ -104,7 +206,6 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
 
         headerRow.ItemsSource = new[] { headerGrid };
 
-        // Data rows
         var rows = new List<Control>();
         foreach (var row in _vm.Rows)
         {
@@ -113,7 +214,6 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
                 ColumnDefinitions = new ColumnDefinitions(colDefs)
             };
 
-            // Center ID cell with double-click threshold editor
             var centerBorder = MakeCell(
                 row.CenterId, 0, false, "#ffffff", "#000000");
 
@@ -136,7 +236,6 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
 
             rowGrid.Children.Add(centerBorder);
 
-            // Count cells using per-ARTCC thresholds
             var artccThreshold = _vm.GetThreshold(row.CenterId);
             int artccIndex = _vm.Rows.IndexOf(row);
             for (int i = 0; i < row.Cells.Count && i < colCount; i++)
@@ -149,7 +248,6 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
 
                 var cellBorder = MakeCell(text, i + 1, false, bg, fg);
 
-                // Capture for closure
                 int capturedArtcc = artccIndex;
                 int capturedCol = i;
                 string capturedCenter = row.CenterId;
@@ -178,13 +276,178 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
         dataRows.ItemsSource = rows;
     }
 
+    private void DoRebuildSectorTable()
+    {
+        var headerRow = this.FindControl<ItemsControl>("HeaderRow");
+        var dataRows = this.FindControl<ItemsControl>("DataRows");
+        if (headerRow == null || dataRows == null) return;
+        if (string.IsNullOrEmpty(_selectedArtcc)) return;
+
+        var sectors = _mapDataService.GetSectorsForArtcc(_selectedArtcc);
+        int colCount = _vm.TimeLabels.Count;
+        string colDefs = "60," +
+            string.Join(",", Enumerable.Repeat("50", colCount));
+
+        // Header row
+        var headerGrid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions(colDefs)
+        };
+        headerGrid.Children.Add(
+            MakeCell("Sector", 0, true, "#ffe4c4", "#000000"));
+        for (int i = 0; i < colCount; i++)
+            headerGrid.Children.Add(
+                MakeCell(_vm.TimeLabels[i], i + 1, true, "#ffe4c4", "#000000"));
+        headerRow.ItemsSource = new[] { headerGrid };
+
+        var uniqueSectors = sectors
+            .GroupBy(s => s.Sector)
+            .OrderBy(g => g.Key)
+            .ToList();
+
+        var parentSectors = new HashSet<string>(
+            _vm.CombineRules.Select(r => r.Parent),
+            StringComparer.OrdinalIgnoreCase);
+        var childSectors = new HashSet<string>(
+            _vm.CombineRules.SelectMany(r => r.Children),
+            StringComparer.OrdinalIgnoreCase);
+
+        // Build ordered rows:
+        // isCombinedRow = blue summary row
+        // isChild = gray child row
+        var orderedRows = new List<(string sectorNum, bool isCombinedRow, bool isChild)>();
+        var placed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var sectorGroup in uniqueSectors)
+        {
+            string sectorNum = sectorGroup.Key;
+            if (placed.Contains(sectorNum)) continue;
+
+            bool isParent = parentSectors.Contains(sectorNum);
+            bool isChild = childSectors.Contains(sectorNum);
+
+            // Pure children get placed under their parent
+            if (isChild && !isParent) continue;
+
+            if (isParent)
+            {
+                // 1. Blue combined row only — no separate parent row
+                orderedRows.Add((sectorNum, true, false));
+                placed.Add(sectorNum);
+
+                // 2. Children immediately after — gray with parentheses
+                var rule = _vm.CombineRules.FirstOrDefault(r =>
+                    r.Parent.Equals(sectorNum,
+                        StringComparison.OrdinalIgnoreCase));
+                if (rule != null)
+                {
+                    foreach (var child in rule.Children)
+                    {
+                        orderedRows.Add((child, false, true));
+                        placed.Add(child);
+                    }
+                }
+            }
+            else
+            {
+                orderedRows.Add((sectorNum, false, false));
+                placed.Add(sectorNum);
+            }
+        }
+
+        var rows = new List<Control>();
+        string artcc = _selectedArtcc!;
+
+        foreach (var (sectorNum, isCombinedRow, isChild) in orderedRows)
+        {
+            if (_hideBaselines && isChild) continue;
+
+            if (isCombinedRow)
+            {
+                // Blue combined row — sum of parent + all children
+                string combinedKey = $"{artcc}-{sectorNum}+".ToUpperInvariant();
+                _vm.SectorCounts.TryGetValue(combinedKey, out var combinedCounts);
+                var threshold = _vm.GetThreshold(combinedKey);
+
+                var rowGrid = new Grid
+                {
+                    ColumnDefinitions = new ColumnDefinitions(colDefs)
+                };
+                rowGrid.Children.Add(
+                    MakeCell($"{sectorNum}+", 0, false, "#0000CC", "#ffffff"));
+
+                for (int i = 0; i < colCount; i++)
+                {
+                    int count = _vm.IsEnabled
+                        ? (combinedCounts != null ? combinedCounts[i] : 0)
+                        : -1;
+                    var (bg, fg, text) = GetCellStyle(
+                        count, _vm.IsEnabled,
+                        threshold.YellowAt,
+                        threshold.RedAt);
+                    rowGrid.Children.Add(MakeCell(text, i + 1, false, bg, fg));
+                }
+
+                rows.Add(rowGrid);
+            }
+            else
+            {
+                // Normal row or gray child row
+                string sectorKey = $"{artcc}-{sectorNum}".ToUpperInvariant();
+                _vm.SectorCounts.TryGetValue(sectorKey, out var counts);
+                var threshold = _vm.GetThreshold(sectorKey);
+
+                string rowBg = isChild ? "#808080" : "#ffffff";
+                string rowFg = isChild ? "#ffffff" : "#000000";
+
+                var rowGrid = new Grid
+                {
+                    ColumnDefinitions = new ColumnDefinitions(colDefs)
+                };
+                rowGrid.Children.Add(
+                    MakeCell(isChild ? $"({sectorNum})" : sectorNum, 0, false, rowBg, rowFg));
+
+                for (int i = 0; i < colCount; i++)
+                {
+                    int count = _vm.IsEnabled
+                        ? (counts != null ? counts[i] : 0)
+                        : -1;
+
+                    if (isChild)
+                    {
+                        // Gray cells but still show counts
+                        var (_, _, text) = GetCellStyle(
+                            count, _vm.IsEnabled,
+                            threshold.YellowAt,
+                            threshold.RedAt);
+                        rowGrid.Children.Add(
+                            MakeCell(text, i + 1, false, "#808080", "#ffffff"));
+                    }
+                    else
+                    {
+                        var (bg, fg, text) = GetCellStyle(
+                            count, _vm.IsEnabled,
+                            threshold.YellowAt,
+                            threshold.RedAt);
+                        rowGrid.Children.Add(
+                            MakeCell(text, i + 1, false, bg, fg));
+                    }
+                }
+
+                rows.Add(rowGrid);
+            }
+        }
+
+        dataRows.ItemsSource = rows;
+    }
+
     private static (string bg, string fg, string text) GetCellStyle(
         int count, bool isEnabled, int yellowAt, int redAt)
     {
         if (!isEnabled)
             return ("#808080", "#808080", "");
         if (count == 0)
-            return ("#00AA00", "#00AA00", "");
+            return ("#00AA00", "#000000", "0");
         if (count >= redAt)
             return ("#FF0000", "#000000", count.ToString());
         if (count >= yellowAt)
@@ -210,9 +473,7 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
                 Text = text,
                 FontFamily = new FontFamily("Courier New"),
                 FontSize = 11,
-                FontWeight = isHeader
-                    ? Avalonia.Media.FontWeight.Bold
-                    : Avalonia.Media.FontWeight.Normal,
+                FontWeight = Avalonia.Media.FontWeight.Bold,
                 Foreground = new SolidColorBrush(Color.Parse(fgHex)),
                 HorizontalAlignment = isHeader
                     ? Avalonia.Layout.HorizontalAlignment.Center
