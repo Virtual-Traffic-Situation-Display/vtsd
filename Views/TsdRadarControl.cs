@@ -14,6 +14,10 @@ namespace vTFMS.Views;
 
 public class TsdRadarControl : Control
 {
+    // Lambert Conformal Conic standard parallels for US
+    private const double Phi1 = 33.0 * Math.PI / 180.0;
+    private const double Phi2 = 45.0 * Math.PI / 180.0;
+
     // Cached polyline geometries
     private Geometry? _stateBoundaryGeometry;
     private Geometry? _countryBoundaryGeometry;
@@ -370,6 +374,7 @@ public class TsdRadarControl : Control
         get => GetValue(RangeRingsProperty);
         set => SetValue(RangeRingsProperty, value);
     }
+
     #endregion
 
     static TsdRadarControl()
@@ -405,6 +410,84 @@ public class TsdRadarControl : Control
     {
         Focusable = true;
         RebuildRenderCache();
+    }
+
+    // -------------------------------------------------------------------------
+    // Lambert Conformal Conic projection
+    // -------------------------------------------------------------------------
+
+    private static (double x, double y) LccProject(
+        double lat, double lon,
+        double centerLat, double centerLon)
+    {
+        double phi = lat * Math.PI / 180.0;
+        double lam = lon * Math.PI / 180.0;
+        double phi0 = centerLat * Math.PI / 180.0;
+        double lam0 = centerLon * Math.PI / 180.0;
+
+        double n = Math.Log(Math.Cos(Phi1) / Math.Cos(Phi2)) /
+                   Math.Log(Math.Tan(Math.PI / 4.0 + Phi2 / 2.0) /
+                            Math.Tan(Math.PI / 4.0 + Phi1 / 2.0));
+
+        double F = Math.Cos(Phi1) *
+                   Math.Pow(Math.Tan(Math.PI / 4.0 + Phi1 / 2.0), n) / n;
+
+        double rho = F / Math.Pow(Math.Tan(Math.PI / 4.0 + phi / 2.0), n);
+        double rho0 = F / Math.Pow(Math.Tan(Math.PI / 4.0 + phi0 / 2.0), n);
+
+        double theta = n * (lam - lam0);
+
+        double x = rho * Math.Sin(theta);
+        double y = rho0 - rho * Math.Cos(theta);
+
+        return (x, y);
+    }
+
+    private static (double lat, double lon) LccInverse(
+        double px, double py,
+        double centerLat, double centerLon)
+    {
+        double phi0 = centerLat * Math.PI / 180.0;
+        double lam0 = centerLon * Math.PI / 180.0;
+
+        double n = Math.Log(Math.Cos(Phi1) / Math.Cos(Phi2)) /
+                   Math.Log(Math.Tan(Math.PI / 4.0 + Phi2 / 2.0) /
+                            Math.Tan(Math.PI / 4.0 + Phi1 / 2.0));
+
+        double F = Math.Cos(Phi1) *
+                   Math.Pow(Math.Tan(Math.PI / 4.0 + Phi1 / 2.0), n) / n;
+
+        double rho0 = F / Math.Pow(Math.Tan(Math.PI / 4.0 + phi0 / 2.0), n);
+
+        double rho = Math.Sign(n) * Math.Sqrt(
+            px * px + (rho0 - py) * (rho0 - py));
+        double theta = Math.Atan2(px, rho0 - py);
+
+        double phi = 2.0 * Math.Atan(Math.Pow(F / rho, 1.0 / n))
+                     - Math.PI / 2.0;
+        double lam = lam0 + theta / n;
+
+        return (phi * 180.0 / Math.PI, lam * 180.0 / Math.PI);
+    }
+
+    private Point LatLonToScreen(double lat, double lon,
+                                  double width, double height)
+    {
+        double scale = Math.Min(width, height) * 0.45 * ZoomLevel;
+
+        var (px, py) = LccProject(lat, lon, CenterLat, CenterLon);
+        var (cx, cy) = LccProject(CenterLat, CenterLon, CenterLat, CenterLon);
+
+        double x = width / 2.0 + (px - cx) * scale / (Math.PI / 180.0) / 57.0;
+        double y = height / 2.0 - (py - cy) * scale / (Math.PI / 180.0) / 57.0;
+
+        return new Point(x, y);
+    }
+
+    private bool IsOnScreen(Point pt, double width, double height)
+    {
+        return pt.X >= -20 && pt.X <= width + 20 &&
+               pt.Y >= -20 && pt.Y <= height + 20;
     }
 
     protected override void OnPropertyChanged(
@@ -485,21 +568,6 @@ public class TsdRadarControl : Control
     {
         _geometriesDirty = true;
         InvalidateVisual();
-    }
-
-    private Point LatLonToScreen(double lat, double lon,
-                                  double width, double height)
-    {
-        double scale = Math.Min(width, height) * 0.45 * ZoomLevel;
-        double x = width / 2 + (lon - CenterLon) * scale / 57.0;
-        double y = height / 2 - (lat - CenterLat) * scale / 57.0;
-        return new Point(x, y);
-    }
-
-    private bool IsOnScreen(Point pt, double width, double height)
-    {
-        return pt.X >= -20 && pt.X <= width + 20 &&
-               pt.Y >= -20 && pt.Y <= height + 20;
     }
 
     private void RebuildGeometries(double width, double height)
@@ -750,12 +818,20 @@ public class TsdRadarControl : Control
         switch (e.Key)
         {
             case Key.M:
-                double scale =
-                    Math.Min(width, height) * 0.45 * ZoomLevel;
-                CenterLon = CenterLon +
-                    (_currentMousePosition.X - width / 2) * 57.0 / scale;
-                CenterLat = CenterLat -
-                    (_currentMousePosition.Y - height / 2) * 57.0 / scale;
+                double scale = Math.Min(width, height) * 0.45 * ZoomLevel;
+
+                // Convert mouse offset to projection units
+                double dxProj = (_currentMousePosition.X - width / 2.0)
+                    * (Math.PI / 180.0) * 57.0 / scale;
+                double dyProj = (_currentMousePosition.Y - height / 2.0)
+                    * (Math.PI / 180.0) * 57.0 / scale;
+
+                // Center in projection space is always (0,0) relative to itself
+                var (newLat, newLon) = LccInverse(
+                    dxProj, -dyProj, CenterLat, CenterLon);
+
+                CenterLat = newLat;
+                CenterLon = newLon;
                 e.Handled = true;
                 ScheduleRadarRefresh();
                 break;
@@ -997,9 +1073,6 @@ public class TsdRadarControl : Control
             for (int r = 1; r <= ringCount; r++)
             {
                 double radiusNm = r * config.IntervalNm;
-
-                // Build a polygon approximating the circle
-                // 1 NM = 1/60 degree of latitude
                 double radiusDegLat = radiusNm / 60.0;
                 double radiusDegLon = radiusDegLat /
                     Math.Cos(config.CenterLat * Math.PI / 180.0);
@@ -1028,7 +1101,6 @@ public class TsdRadarControl : Control
 
                 context.DrawGeometry(null, pen, geo);
 
-                // Ring distance label at 12 o'clock
                 double labelLat = config.CenterLat + radiusDegLat;
                 var labelPt = LatLonToScreen(
                     labelLat, config.CenterLon, width, height);
@@ -1044,7 +1116,6 @@ public class TsdRadarControl : Control
                     labelPt.Y - ringLabel.Height - 2));
             }
 
-            // Draw center dot and label
             var centerPt = LatLonToScreen(
                 config.CenterLat, config.CenterLon, width, height);
 
@@ -1204,8 +1275,6 @@ public class TsdRadarControl : Control
                         context.DrawGeometry(null, _sectorPen, sectorGeo);
                     }
 
-                    // Two-line label at centroid
-                    // Two-line label at centroid of each ring individually
                     foreach (var labelRing in item.Rings)
                     {
                         if (labelRing.Count == 0) continue;

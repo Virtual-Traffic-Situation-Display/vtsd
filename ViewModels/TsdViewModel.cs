@@ -23,13 +23,13 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     public double LastScreenHeight => _lastScreenHeight;
 
     [ObservableProperty]
-    private double _centerLat = 39.5;
+    private double _centerLat = 38.5;
 
     [ObservableProperty]
-    private double _centerLon = -98.35;
+    private double _centerLon = -96.0;
 
     [ObservableProperty]
-    private double _zoomLevel = 1.0;
+    private double _zoomLevel = 4.0;
 
     [ObservableProperty]
     private bool _showAirports = false;
@@ -105,7 +105,7 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     }
 
     [ObservableProperty]
-    private bool _showArtcc = false;
+    private bool _showArtcc = true;
 
     [ObservableProperty]
     private bool _showFlightCount = false;
@@ -606,6 +606,7 @@ public partial class TsdViewModel : ObservableObject, IDisposable
             });
         });
     }
+
     private void OnRadarUpdated(object? sender, byte[]? data)
     {
         if (data == null) return;
@@ -614,30 +615,104 @@ public partial class TsdViewModel : ObservableObject, IDisposable
             RadarImageData = data;
         });
     }
+    public (double minLat, double minLon, double maxLat, double maxLon)
+GetVisibleBounds(double screenWidth, double screenHeight)
+    {
+        double scale = Math.Min(screenWidth, screenHeight) * 0.45 * ZoomLevel;
+        double projScale = (Math.PI / 180.0) * 57.0 / scale;
+
+        // Project center point
+        double phi0 = CenterLat * Math.PI / 180.0;
+        double lam0 = CenterLon * Math.PI / 180.0;
+
+        const double phi1 = 33.0 * Math.PI / 180.0;
+        const double phi2 = 45.0 * Math.PI / 180.0;
+
+        double n = Math.Log(Math.Cos(phi1) / Math.Cos(phi2)) /
+                   Math.Log(Math.Tan(Math.PI / 4.0 + phi2 / 2.0) /
+                            Math.Tan(Math.PI / 4.0 + phi1 / 2.0));
+
+        double F = Math.Cos(phi1) *
+                   Math.Pow(Math.Tan(Math.PI / 4.0 + phi1 / 2.0), n) / n;
+
+        double rho0 = F / Math.Pow(Math.Tan(Math.PI / 4.0 + phi0 / 2.0), n);
+
+        // Half extents in projection units
+        double halfW = screenWidth / 2.0 * projScale;
+        double halfH = screenHeight / 2.0 * projScale;
+
+        // Inverse project the four corners
+        double[] lats = new double[4];
+        double[] lons = new double[4];
+
+        (double px, double py)[] corners = new[]
+        {
+        (-halfW,  halfH), // top-left
+        ( halfW,  halfH), // top-right
+        (-halfW, -halfH), // bottom-left
+        ( halfW, -halfH)  // bottom-right
+    };
+
+        for (int i = 0; i < 4; i++)
+        {
+            double rho = Math.Sign(n) * Math.Sqrt(
+                corners[i].px * corners[i].px +
+                (rho0 - corners[i].py) * (rho0 - corners[i].py));
+            double theta = Math.Atan2(corners[i].px, rho0 - corners[i].py);
+
+            double phi = 2.0 * Math.Atan(Math.Pow(F / rho, 1.0 / n))
+                         - Math.PI / 2.0;
+            double lam = lam0 + theta / n;
+
+            lats[i] = phi * 180.0 / Math.PI;
+            lons[i] = lam * 180.0 / Math.PI;
+        }
+
+        return (
+            lats.Min(),
+            lons.Min(),
+            lats.Max(),
+            lons.Max()
+        );
+    }
 
     private bool IsInMapView(double lat, double lon)
     {
         double range = 50.0 / ZoomLevel;
+        double lonScale = Math.Cos(CenterLat * Math.PI / 180.0);
         return Math.Abs(lat - CenterLat) < range &&
-               Math.Abs(lon - CenterLon) < range * 1.5;
+               Math.Abs(lon - CenterLon) < range * 1.5 / lonScale;
     }
+    //private bool IsInMapView(double lat, double lon)
+    //{
+    //    double range = 50.0 / ZoomLevel;
+    //    double lonScale = Math.Cos(CenterLat * Math.PI / 180.0);
+    //    return Math.Abs(lat - CenterLat) < range &&
+    //           Math.Abs(lon - CenterLon) < range * 1.5 / lonScale;
+    //}
 
-    public (double minLat, double minLon, double maxLat, double maxLon)
-    GetVisibleBounds(double screenWidth, double screenHeight)
-    {
-        double scale = Math.Min(screenWidth, screenHeight)
-            * 0.45 * ZoomLevel;
+    //public (double minLat, double minLon, double maxLat, double maxLon)
+    //   GetVisibleBounds(double screenWidth, double screenHeight)
+    //{
+    //    double scale = Math.Min(screenWidth, screenHeight) * 0.45 * ZoomLevel;
 
-        double latRange = screenHeight / 2 * 57.0 / scale;
-        double lonRange = screenWidth / 2 * 57.0 / scale;
+    //    double lonRange = screenWidth / 2.0 * 57.0 / scale;
 
-        return (
-            CenterLat - latRange,
-            CenterLon - lonRange,
-            CenterLat + latRange,
-            CenterLon + lonRange
-        );
-    }
+    //    // Inverse Mercator for lat bounds
+    //    double centerLatRad = CenterLat * Math.PI / 180.0;
+    //    double mercCenterY = Math.Log(Math.Tan(Math.PI / 4.0 + centerLatRad / 2.0));
+    //    double latMercRange = screenHeight / 2.0 * (Math.PI / 180.0) * 57.0 / scale;
+
+    //    double maxLatRad = 2.0 * Math.Atan(Math.Exp(mercCenterY + latMercRange)) - Math.PI / 2.0;
+    //    double minLatRad = 2.0 * Math.Atan(Math.Exp(mercCenterY - latMercRange)) - Math.PI / 2.0;
+
+    //    return (
+    //        minLatRad * 180.0 / Math.PI,
+    //        CenterLon - lonRange,
+    //        maxLatRad * 180.0 / Math.PI,
+    //        CenterLon + lonRange
+    //    );
+    //}
 
     public void Dispose()
     {
