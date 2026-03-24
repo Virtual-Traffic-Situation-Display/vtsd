@@ -27,6 +27,7 @@ public partial class App : Application
             IProfileService profileService = new ProfileService();
             IWeatherService weatherService = new WeatherService();
             IFontService fontService = new FontService();
+            IUpdateService updateService = new UpdateService();
     
             desktop.MainWindow = new MainWindow();
     
@@ -35,7 +36,7 @@ public partial class App : Application
     
             var mainViewModel = new MainViewModel(panelManager, mapDataService,
                 vatsimService, profileService, weatherService,
-                fontService, desktop.MainWindow);
+                fontService, updateService, desktop.MainWindow);
     
             desktop.MainWindow.DataContext = mainViewModel;
             desktop.Exit += (_, _) => mainViewModel.Dispose();

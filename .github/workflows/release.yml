@@ -12,15 +12,19 @@ jobs:
           - rid: win-x64
             os: windows-latest
             artifact: vTFMS-win-x64
+            mainExe: vTFMS.exe
           - rid: linux-x64
             os: ubuntu-latest
             artifact: vTFMS-linux-x64
+            mainExe: vTFMS
           - rid: osx-x64
             os: macos-latest
             artifact: vTFMS-osx-x64
+            mainExe: vTFMS
           - rid: osx-arm64
             os: macos-latest
             artifact: vTFMS-osx-arm64
+            mainExe: vTFMS
 
     runs-on: ${{ matrix.os }}
 
@@ -37,18 +41,24 @@ jobs:
         run: dotnet publish -c Release -r ${{ matrix.rid }} -p:Version=${GITHUB_REF_NAME#v}
         shell: bash
 
-      - name: Zip output
+      - name: Install vpk
+        run: dotnet tool install -g vpk
+
+      - name: Pack with Velopack
         run: |
-          OUTDIR="$(pwd)"
-          cd bin/Release/net10.0/${{ matrix.rid }}/publish
-          7z a -tzip "$OUTDIR/${{ matrix.artifact }}.zip" .
+          vpk pack \
+            --packId vTFMS \
+            --packVersion ${GITHUB_REF_NAME#v} \
+            --packDir bin/Release/net10.0/${{ matrix.rid }}/publish \
+            --mainExe ${{ matrix.mainExe }} \
+            --outputDir releases
         shell: bash
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}.zip
+          path: releases/
 
   release:
     needs: publish
@@ -65,5 +75,6 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*.zip
+          files: artifacts/**/*
           generate_release_notes: true
+          prerelease: true   # flip to false when you ship a stable release
