@@ -337,24 +337,14 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                 added++;
                 continue;
             }
-
             MapItem? item = null;
 
-            var airport = _mapDataService.FindAirport(id);
-            if (airport != null)
+            // If identifier ends with V, treat it as a forced navaid lookup (strip the V)
+            // e.g. ORLV -> look up ORL as a navaid/VOR only
+            if (id.EndsWith("V") && id.Length > 1)
             {
-                item = new MapItem
-                {
-                    Identifier = airport.Identifier,
-                    Type = "Airport",
-                    Lat = airport.Lat,
-                    Lon = airport.Lon
-                };
-            }
-
-            if (item == null)
-            {
-                var navaid = _mapDataService.FindNavaid(id);
+                var navaidId = id[..^1]; // strip trailing V
+                var navaid = _mapDataService.FindNavaid(navaidId);
                 if (navaid != null)
                 {
                     item = new MapItem
@@ -364,6 +354,35 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                         Lat = navaid.Lat,
                         Lon = navaid.Lon
                     };
+                }
+            }
+            else
+            {
+                var airport = _mapDataService.FindAirport(id);
+                if (airport != null)
+                {
+                    item = new MapItem
+                    {
+                        Identifier = airport.Identifier,
+                        Type = "Airport",
+                        Lat = airport.Lat,
+                        Lon = airport.Lon
+                    };
+                }
+
+                if (item == null)
+                {
+                    var navaid = _mapDataService.FindNavaid(id);
+                    if (navaid != null)
+                    {
+                        item = new MapItem
+                        {
+                            Identifier = navaid.Identifier,
+                            Type = navaid.Type,
+                            Lat = navaid.Lat,
+                            Lon = navaid.Lon
+                        };
+                    }
                 }
             }
 
@@ -491,13 +510,13 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     {
         var airport = _mapDataService.FindAirport(id);
         if (airport != null) return (airport.Lat, airport.Lon);
-    
+
         var navaid = _mapDataService.FindNavaid(id);
         if (navaid != null) return (navaid.Lat, navaid.Lon);
-    
+
         var waypoint = _mapDataService.FindWaypoint(id);
         if (waypoint != null) return (waypoint.Lat, waypoint.Lon);
-    
+
         return null;
     }
 
@@ -528,16 +547,16 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                     (!string.IsNullOrWhiteSpace(f.Arrival) ||
                      !string.IsNullOrWhiteSpace(f.Departure)))
                 .ToList();
-    
+
             if (!ShowAllAircraft && !activeFilters.Any())
             {
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                     VisiblePilots.Clear());
                 return;
             }
-    
+
             var matched = new List<VatsimPilot>();
-    
+
             foreach (var pilot in pilots)
             {
                 if (!IsInMapView(pilot.Lat, pilot.Lon)) continue;
@@ -547,7 +566,7 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                     (pilot.Altitude < AltitudeFloor ||
                      pilot.Altitude > AltitudeCeiling))
                     continue;
-    
+
                 bool matchedFilter = false;
                 foreach (var filter in activeFilters)
                 {
@@ -558,7 +577,7 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                             .Any(a => pilot.Arrival.Contains(
                                 a.ToUpperInvariant(),
                                 StringComparison.OrdinalIgnoreCase));
-    
+
                     bool departureMatch =
                         string.IsNullOrWhiteSpace(filter.Departure) ||
                         filter.Departure
@@ -566,7 +585,7 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                             .Any(d => pilot.Departure.Contains(
                                 d.ToUpperInvariant(),
                                 StringComparison.OrdinalIgnoreCase));
-    
+
                     if (arrivalMatch && departureMatch)
                     {
                         matchedFilter = true;
@@ -576,7 +595,7 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                         break;
                     }
                 }
-    
+
                 if (matchedFilter)
                 {
                     if (pilot.MatchedDrawRoute &&
@@ -597,7 +616,7 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                     matched.Add(pilot);
                 }
             }
-    
+
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 VisiblePilots.Clear();
