@@ -11,6 +11,7 @@ public class ArtccThreshold
 
 public class SectorCombineRule
 {
+    public string Artcc { get; set; } = string.Empty;
     public string Parent { get; set; } = string.Empty;
     public List<string> Children { get; set; } = new();
 }

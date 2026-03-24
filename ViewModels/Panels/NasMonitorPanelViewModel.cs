@@ -45,7 +45,7 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
     [ObservableProperty]
     private int _traconAltitude = 99999;
 
-    // Combine rules — list of parent+children rules
+    // Combine rules — scoped per ARTCC
     public List<SectorCombineRule> CombineRules { get; private set; } = new();
 
     public void SetCombineRules(List<SectorCombineRule> rules)
@@ -56,7 +56,7 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
     }
 
     // Sector counts — key: "ZJX-02", value: count per time slot
-    // Combined rows use key: "ZJX-50+" 
+    // Combined rows use key: "ZJX-50+"
     public Dictionary<string, int[]> SectorCounts { get; private set; } = new();
 
     // ARTCC summary counts
@@ -64,6 +64,14 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
 
     private Dictionary<(int, int), List<(VatsimPilot pilot, LatLon pos)>>
         _cellDetails = new();
+
+    private class TupleStringComparer : IEqualityComparer<(string, string)>
+    {
+        public bool Equals((string, string) x, (string, string) y) =>
+            x.Item1 == y.Item1 && x.Item2 == y.Item2;
+        public int GetHashCode((string, string) obj) =>
+            HashCode.Combine(obj.Item1, obj.Item2);
+    }
 
     public ArtccThreshold GetThreshold(string identifier)
     {
@@ -242,12 +250,23 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
         var rules = CombineRules.ToList();
         var monitoredTracons = MonitoredTracons.ToList();
 
-        // Build lookup: child sector → parent sector
-        var childToParent = new Dictionary<string, string>(
-            StringComparer.OrdinalIgnoreCase);
+        // Normalize parent and children in the lookup build
+        var childToParent = new Dictionary<(string, string), string>(
+            new TupleStringComparer());
         foreach (var rule in rules)
+        {
+            string normalizedParent = rule.Parent.TrimStart('0').PadLeft(1, '0');
             foreach (var child in rule.Children)
-                childToParent[child] = rule.Parent;
+            {
+                string normalizedChild = child.TrimStart('0').PadLeft(1, '0');
+                if (!string.IsNullOrEmpty(rule.Artcc))
+                    childToParent[(
+                        rule.Artcc.ToUpperInvariant(),
+                        normalizedChild)] = normalizedParent;
+                if (!childToParent.ContainsKey(("", normalizedChild)))
+                    childToParent[("", normalizedChild)] = normalizedParent;
+            }
+        }
 
         var now = DateTime.UtcNow;
         int minutesToNext = now.Minute % 15 == 0 ? 15 : 15 - (now.Minute % 15);
@@ -266,109 +285,19 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
         int colCount = timeSlots.Count;
         int[] minutes = timeSlots.ToArray();
 
-        var (artccCounts, sectorCounts, details, traconCounts) = await Task.Run(() =>
-        {
-            var artccResult = new Dictionary<string, int[]>(
-                StringComparer.OrdinalIgnoreCase);
-            foreach (var artcc in artccList)
-                artccResult[artcc.Identifier] = new int[colCount];
-
-            var sectorResult = new Dictionary<string, int[]>(
-                StringComparer.OrdinalIgnoreCase);
-
-            var detailMap = new Dictionary<(int, int),
-                List<(VatsimPilot, LatLon)>>();
-
-            foreach (var pilot in pilots)
+        var (artccCounts, sectorCounts, details, traconCounts) =
+            await Task.Run(() =>
             {
-                if (pilot.GroundSpeed <= 35) continue;
+                var artccResult = new Dictionary<string, int[]>(
+                    StringComparer.OrdinalIgnoreCase);
+                foreach (var artcc in artccList)
+                    artccResult[artcc.Identifier] = new int[colCount];
 
-                try
-                {
-                    for (int col = 0; col < colCount; col++)
-                    {
-                        LatLon? pos;
-                        int estimatedAlt;
+                var sectorResult = new Dictionary<string, int[]>(
+                    StringComparer.OrdinalIgnoreCase);
 
-                        if (minutes[col] == 0)
-                        {
-                            pos = new LatLon(pilot.Lat, pilot.Lon);
-                            estimatedAlt = pilot.Altitude;
-                        }
-                        else
-                        {
-                            pos = RouteProjector.ProjectPosition(
-                                pilot, minutes[col]);
-                            if (pos == null) continue;
-                            estimatedAlt = _mapDataService.EstimateAltitude(
-                                pilot, pos);
-                        }
-
-                        var sector = _mapDataService.FindSectorForPosition(
-                            pos.Lat, pos.Lon, estimatedAlt);
-
-                        if (sector == null) continue;
-
-                        string artcc = sector.Artcc;
-                        string sectorNum = sector.Sector;
-
-                        // Individual sector count
-                        var individualKey = $"{artcc}-{sectorNum}";
-                        if (!sectorResult.ContainsKey(individualKey))
-                            sectorResult[individualKey] = new int[colCount];
-                        sectorResult[individualKey][col]++;
-
-                        // If this sector is a child or parent in a combine
-                        // rule, also add to the combined row key "ARTCC-50+"
-                        string effectiveParent = childToParent
-                            .TryGetValue(sectorNum, out var p) ? p : null!;
-                        bool isParent = rules.Any(r =>
-                            r.Parent.Equals(sectorNum,
-                                StringComparison.OrdinalIgnoreCase));
-
-                        if (effectiveParent != null || isParent)
-                        {
-                            string parentSector = effectiveParent ?? sectorNum;
-                            var combinedKey = $"{artcc}-{parentSector}+";
-                            if (!sectorResult.ContainsKey(combinedKey))
-                                sectorResult[combinedKey] = new int[colCount];
-                            sectorResult[combinedKey][col]++;
-                        }
-
-                        // ARTCC count
-                        if (artccResult.ContainsKey(artcc))
-                            artccResult[artcc][col]++;
-
-                        // Detail map
-                        int artccIdx = artccList.FindIndex(a =>
-                            a.Identifier.Equals(artcc,
-                                StringComparison.OrdinalIgnoreCase));
-                        if (artccIdx >= 0)
-                        {
-                            var key = (artccIdx, col);
-                            if (!detailMap.ContainsKey(key))
-                                detailMap[key] = new();
-                            detailMap[key].Add((pilot, pos));
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine(
-                        $"NasMonitor: error on {pilot.Callsign} — " +
-                        $"{ex.GetType().Name}: {ex.Message}");
-                }
-            }
-
-            // TRACON counts
-            var traconResult = new Dictionary<string, int[]>(
-                StringComparer.OrdinalIgnoreCase);
-
-            foreach (var config in monitoredTracons)
-            {
-                traconResult[config.Identifier] = new int[colCount];
-                var boundaries = _mapDataService.FindTracons(config.Identifier);
-                var allRings = boundaries.SelectMany(b => b.Rings).ToList();
+                var detailMap = new Dictionary<(int, int),
+                    List<(VatsimPilot, LatLon)>>();
 
                 foreach (var pilot in pilots)
                 {
@@ -395,22 +324,126 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
                                     pilot, pos);
                             }
 
-                            if (estimatedAlt > config.AltitudeCeiling) continue;
+                            var sector = _mapDataService.FindSectorForPosition(
+                                pos.Lat, pos.Lon, estimatedAlt);
 
-                            bool inside = allRings.Any(ring =>
-                                _mapDataService.IsPointInPolygon(
-                                    pos.Lat, pos.Lon, ring));
+                            if (sector == null) continue;
 
-                            if (inside)
-                                traconResult[config.Identifier][col]++;
+                            string artcc = sector.Artcc;
+                            string sectorNum = sector.Sector;
+
+                            // Individual sector count
+                            var individualKey =
+                                $"{artcc}-{sectorNum}".ToUpperInvariant();
+                            if (!sectorResult.ContainsKey(individualKey))
+                                sectorResult[individualKey] = new int[colCount];
+                            sectorResult[individualKey][col]++;
+
+                            // Check if this sector is a parent in a combine
+                            // rule — match on specific ARTCC or empty ARTCC
+                            bool isParent = rules.Any(r =>
+                                (string.IsNullOrEmpty(r.Artcc) ||
+                                 r.Artcc.Equals(artcc, StringComparison.OrdinalIgnoreCase)) &&
+                                r.Parent.TrimStart('0').PadLeft(1, '0').Equals(
+                                    sectorNum, StringComparison.OrdinalIgnoreCase));
+
+                            // Look up parent — try specific ARTCC first,
+                            // then fall back to empty ARTCC legacy rules
+                            string? effectiveParent =
+                                childToParent.TryGetValue(
+                                    (artcc.ToUpperInvariant(),
+                                     sectorNum.ToUpperInvariant()),
+                                    out var p1) ? p1 :
+                                childToParent.TryGetValue(
+                                    ("", sectorNum.ToUpperInvariant()),
+                                    out var p2) ? p2 : null;
+
+                            if (effectiveParent != null || isParent)
+                            {
+                                string parentSector = effectiveParent ?? sectorNum;
+                                var combinedKey =
+                                    $"{artcc}-{parentSector}+".ToUpperInvariant();
+                                if (!sectorResult.ContainsKey(combinedKey))
+                                    sectorResult[combinedKey] = new int[colCount];
+                                sectorResult[combinedKey][col]++;
+                            }
+
+                            // ARTCC count
+                            if (artccResult.ContainsKey(artcc))
+                                artccResult[artcc][col]++;
+
+                            // Detail map
+                            int artccIdx = artccList.FindIndex(a =>
+                                a.Identifier.Equals(artcc,
+                                    StringComparison.OrdinalIgnoreCase));
+                            if (artccIdx >= 0)
+                            {
+                                var key = (artccIdx, col);
+                                if (!detailMap.ContainsKey(key))
+                                    detailMap[key] = new();
+                                detailMap[key].Add((pilot, pos));
+                            }
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            $"NasMonitor: error on {pilot.Callsign} — " +
+                            $"{ex.GetType().Name}: {ex.Message}");
+                    }
                 }
-            }
 
-            return (artccResult, sectorResult, detailMap, traconResult);
-        });
+                // TRACON counts
+                var traconResult = new Dictionary<string, int[]>(
+                    StringComparer.OrdinalIgnoreCase);
+
+                foreach (var config in monitoredTracons)
+                {
+                    traconResult[config.Identifier] = new int[colCount];
+                    var boundaries = _mapDataService.FindTracons(config.Identifier);
+                    var allRings = boundaries.SelectMany(b => b.Rings).ToList();
+
+                    foreach (var pilot in pilots)
+                    {
+                        if (pilot.GroundSpeed <= 35) continue;
+
+                        try
+                        {
+                            for (int col = 0; col < colCount; col++)
+                            {
+                                LatLon? pos;
+                                int estimatedAlt;
+
+                                if (minutes[col] == 0)
+                                {
+                                    pos = new LatLon(pilot.Lat, pilot.Lon);
+                                    estimatedAlt = pilot.Altitude;
+                                }
+                                else
+                                {
+                                    pos = RouteProjector.ProjectPosition(
+                                        pilot, minutes[col]);
+                                    if (pos == null) continue;
+                                    estimatedAlt = _mapDataService.EstimateAltitude(
+                                        pilot, pos);
+                                }
+
+                                if (estimatedAlt > config.AltitudeCeiling) continue;
+
+                                bool inside = allRings.Any(ring =>
+                                    _mapDataService.IsPointInPolygon(
+                                        pos.Lat, pos.Lon, ring));
+
+                                if (inside)
+                                    traconResult[config.Identifier][col]++;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                return (artccResult, sectorResult, detailMap, traconResult);
+            });
 
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
@@ -575,6 +608,22 @@ public partial class NasMonitorPanelViewModel : BasePanelViewModel, IDisposable
 
                 OnPropertyChanged(nameof(Rows));
                 OnPropertyChanged(nameof(SectorCounts));
+
+                // Normalize all loaded combine rules to match stripped sector numbers
+                CombineRules = CombineRules.Select(r => new SectorCombineRule
+                {
+                    Artcc = r.Artcc,
+                    Parent = r.Parent.TrimStart('0').PadLeft(1, '0'),
+                    Children = r.Children
+                        .Select(c => c.TrimStart('0').PadLeft(1, '0'))
+                        .ToList()
+                }).ToList();
+
+                // Trigger recalculate to show updated counts
+                if (IsEnabled)
+                    _ = RecalculateAsync();
+                else
+                    OnPropertyChanged(nameof(SectorCounts));
             }
         }
     }

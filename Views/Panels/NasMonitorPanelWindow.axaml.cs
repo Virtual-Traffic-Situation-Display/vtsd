@@ -45,15 +45,13 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
             artccSelector.ItemsSource = artccs;
             if (artccs.Count > 0)
                 artccSelector.SelectedIndex = 0;
-            artccSelector.IsVisible = false; // ADD THIS
+            artccSelector.IsVisible = false;
         }
 
         var sectorToolbarInit = this.FindControl<StackPanel>("SectorToolbar");
-        if (sectorToolbarInit != null) sectorToolbarInit.IsVisible = false; // ADD THIS
+        if (sectorToolbarInit != null) sectorToolbarInit.IsVisible = false;
 
         DataScroll.ScrollChanged += (_, e) =>
-
-                DataScroll.ScrollChanged += (_, e) =>
             HeaderScroll.Offset = new Avalonia.Vector(
                 DataScroll.Offset.X, HeaderScroll.Offset.Y);
 
@@ -89,7 +87,7 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
     }
 
     private void SummaryView_Checked(object? sender,
-    Avalonia.Interactivity.RoutedEventArgs e)
+        Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (sender is RadioButton rb && rb.IsChecked != true) return;
 
@@ -152,9 +150,11 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
         {
             var newRules = rules.Select(r => new SectorCombineRule
             {
-                Parent = r.parent,
+                Artcc = _selectedArtcc!,
+                Parent = r.parent.TrimStart('0').PadLeft(1, '0'),
                 Children = r.children
                     .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(c => c.TrimStart('0').PadLeft(1, '0'))
                     .ToList()
             }).ToList();
 
@@ -178,7 +178,7 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
     }
 
     private void HideTracons_Click(object? sender,
-    Avalonia.Interactivity.RoutedEventArgs e)
+        Avalonia.Interactivity.RoutedEventArgs e)
     {
         _hideTracons = !_hideTracons;
 
@@ -196,7 +196,6 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
         _rebuildDebounce = new CancellationTokenSource();
         var token = _rebuildDebounce.Token;
 
-        // Capture state NOW before the async delay
         bool sectorView = _sectorViewActive;
         string? selectedArtcc = _selectedArtcc;
 
@@ -305,7 +304,6 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
             rows.Add(rowGrid);
         }
 
-        // TRACON rows — hidden if _hideTracons is true
         if (!_hideTracons)
         {
             foreach (var config in _vm.MonitoredTracons)
@@ -458,8 +456,24 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
                 {
                     ColumnDefinitions = new ColumnDefinitions(colDefs)
                 };
-                rowGrid.Children.Add(
-                    MakeCell($"{sectorNum}+", 0, false, "#0000CC", "#ffffff"));
+
+                var combinedLabelCell = MakeCell(
+                    $"{sectorNum}+", 0, false, "#0000CC", "#ffffff");
+
+                combinedLabelCell.DoubleTapped += (_, _) =>
+                {
+                    var t = _vm.GetThreshold(combinedKey);
+                    var popup = new ArtccThresholdWindow(
+                        combinedKey, t.YellowAt, t.RedAt);
+                    popup.ThresholdSet += (_, t2) =>
+                    {
+                        _vm.SetThreshold(combinedKey, t2.yellow, t2.red);
+                        RebuildTable();
+                    };
+                    popup.ShowDialog(this);
+                };
+
+                rowGrid.Children.Add(combinedLabelCell);
 
                 for (int i = 0; i < colCount; i++)
                 {
@@ -488,9 +502,28 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
                 {
                     ColumnDefinitions = new ColumnDefinitions(colDefs)
                 };
-                rowGrid.Children.Add(
-                    MakeCell(isChild ? $"({sectorNum})" : sectorNum,
-                        0, false, rowBg, rowFg));
+
+                var sectorLabelCell = MakeCell(
+                    isChild ? $"({sectorNum})" : sectorNum,
+                    0, false, rowBg, rowFg);
+
+                if (!isChild)
+                {
+                    sectorLabelCell.DoubleTapped += (_, _) =>
+                    {
+                        var t = _vm.GetThreshold(sectorKey);
+                        var popup = new ArtccThresholdWindow(
+                            sectorKey, t.YellowAt, t.RedAt);
+                        popup.ThresholdSet += (_, t2) =>
+                        {
+                            _vm.SetThreshold(sectorKey, t2.yellow, t2.red);
+                            RebuildTable();
+                        };
+                        popup.ShowDialog(this);
+                    };
+                }
+
+                rowGrid.Children.Add(sectorLabelCell);
 
                 for (int i = 0; i < colCount; i++)
                 {
@@ -522,7 +555,6 @@ public partial class NasMonitorPanelWindow : BasePanelWindow
             }
         }
 
-        // TRACON rows — hidden if _hideTracons is true
         if (!_hideTracons)
         {
             foreach (var config in _vm.MonitoredTracons)
