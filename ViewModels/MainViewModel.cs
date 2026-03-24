@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Reflection;
+using vTFMS.Helpers;
 using vTFMS.Models;
 using vTFMS.Services;
 using vTFMS.ViewModels;
@@ -22,6 +23,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly IWeatherService _weatherService;
     private readonly IMapDataService _mapDataService;
     private readonly IFontService _fontService;
+    private readonly IUpdateService _updateService;
     private readonly Window _mainWindow;
 
 
@@ -83,6 +85,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                          IProfileService profileService,
                          IWeatherService weatherService,
                          IFontService fontService,
+                         IUpdateService updateService,
                          Window mainWindow)
     {
         _panelManager = panelManager;
@@ -90,6 +93,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _weatherService = weatherService;
         _fontService = fontService;
         _mapDataService = mapDataService;
+        _updateService = updateService;
         _mainWindow = mainWindow;
         TsdViewModel = new TsdViewModel(mapDataService, vatsimService, weatherService);
 
@@ -173,6 +177,35 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         var about = new AboutWindow(AppVersion);
         about.Show(_mainWindow);
+    }
+
+    [RelayCommand]
+    private async Task CheckForUpdates()
+    {
+        var updateInfo = await _updateService.CheckForUpdatesAsync();
+    
+        if (updateInfo == null)
+        {
+            // No update found (or running in dev mode) — tell the user
+            await MessageBoxHelper.ShowInfoAsync(
+                _mainWindow,
+                title: "No Updates",
+                message: "You're already on the latest version.");
+            return;
+        }
+    
+        var newVersion = updateInfo.TargetFullRelease.Version;
+    
+        var confirmed = await MessageBoxHelper.ShowConfirmAsync(
+            _mainWindow,
+            title: "Update Available",
+            message: $"Version {newVersion} is available. Download and install now?\n\nThe app will restart automatically.");
+    
+        if (!confirmed)
+            return;
+    
+        await _updateService.DownloadAndApplyUpdateAsync(updateInfo);
+        // Does not return — app restarts here
     }
 
     [RelayCommand]

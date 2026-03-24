@@ -175,6 +175,9 @@
 
       <MenuItem Header="Help" Foreground="{StaticResource ForegroundPrimaryBrush}"
           FontFamily="Arial" FontSize="13">
+        <MenuItem Header="Check for Updates"
+            FontFamily="Arial" FontSize="12"
+            Command="{Binding CheckForUpdatesCommand}"/>
         <MenuItem Header="About..."
             FontFamily="Arial" FontSize="12"
             Command="{Binding OpenAboutCommand}"/>
