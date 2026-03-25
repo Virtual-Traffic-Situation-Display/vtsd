@@ -64,6 +64,7 @@ public class TsdRadarControl : Control
     private SolidColorBrush _mapLabelBrush = new(Colors.Cyan);
 
     public event EventHandler? RadarRefreshRequested;
+    public event EventHandler<VatsimPilot>? RouteResolveRequested;
 
     #region Styled Properties
 
@@ -821,6 +822,134 @@ public class TsdRadarControl : Control
         Focus();
     }
 
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+
+        var point = e.GetCurrentPoint(this);
+        if (!point.Properties.IsRightButtonPressed) return;
+
+        // Hit-test against visible pilots
+        var clickPos = point.Position;
+        VatsimPilot? clickedPilot = null;
+
+        foreach (var pilot in VisiblePilots)
+        {
+            if (pilot.IsHidden) continue;
+            var pt = LatLonToScreen(pilot.Lat, pilot.Lon,
+                Bounds.Width, Bounds.Height);
+            double dx = clickPos.X - pt.X;
+            double dy = clickPos.Y - pt.Y;
+
+            if (Math.Sqrt(dx * dx + dy * dy) <= 10.0)
+            {
+                clickedPilot = pilot;
+                break;
+            }
+        }
+
+        if (clickedPilot == null) return;
+
+        var menu = new ContextMenu();
+
+        var dataBlockItem = new MenuItem
+        {
+            Header = clickedPilot.ShowDataBlock
+                ? "Hide Data Block" : "Show Data Block"
+        };
+        dataBlockItem.Click += (_, _) =>
+        {
+            clickedPilot.ShowDataBlock = !clickedPilot.ShowDataBlock;
+            InvalidateVisual();
+        };
+        menu.Items.Add(dataBlockItem);
+
+        var orgDestItem = new MenuItem
+        {
+            Header = clickedPilot.ShowOrgDest
+                ? "Hide Org/Dest" : "Show Org/Dest"
+        };
+        orgDestItem.Click += (_, _) =>
+        {
+            clickedPilot.ShowOrgDest = !clickedPilot.ShowOrgDest;
+            InvalidateVisual();
+        };
+        menu.Items.Add(orgDestItem);
+
+        var drawRouteItem = new MenuItem
+        {
+            Header = (clickedPilot.ManualDrawRoute || clickedPilot.MatchedDrawRoute)
+                ? "Hide Route" : "Draw Route"
+        };
+        drawRouteItem.Click += (_, _) =>
+        {
+            clickedPilot.ManualDrawRoute = !clickedPilot.ManualDrawRoute;
+            // Resolve route if needed
+            if (clickedPilot.ManualDrawRoute &&
+                clickedPilot.ParsedRoute.Count == 0 &&
+                !string.IsNullOrWhiteSpace(clickedPilot.Route))
+            {
+                RouteResolveRequested?.Invoke(this, clickedPilot);
+            }
+            InvalidateVisual();
+        };
+        menu.Items.Add(drawRouteItem);
+
+        var showRouteItem = new MenuItem
+        {
+            Header = (clickedPilot.ManualShowRoute || clickedPilot.MatchedShowRoute)
+                ? "Hide Route Text" : "Show Route Text"
+        };
+        showRouteItem.Click += (_, _) =>
+        {
+            clickedPilot.ManualShowRoute = !clickedPilot.ManualShowRoute;
+            InvalidateVisual();
+        };
+        menu.Items.Add(showRouteItem);
+
+        var colorMenu = new MenuItem { Header = "Change Color" };
+        var colors = new Dictionary<string, string>
+        {
+            { "White",   "#FFFFFF" },
+            { "Cyan",    "#00FFFF" },
+            { "Green",   "#00FF00" },
+            { "Yellow",  "#FFFF00" },
+            { "Orange",  "#FFA500" },
+            { "Red",     "#FF0000" },
+            { "Magenta", "#FF00FF" },
+            { "Reset",   "" }
+        };
+
+        foreach (var (name, hex) in colors)
+        {
+            var colorItem = new MenuItem { Header = name };
+            var capturedHex = hex;
+            colorItem.Click += (_, _) =>
+            {
+                clickedPilot.ColorOverride =
+                    string.IsNullOrEmpty(capturedHex) ? null : capturedHex;
+                InvalidateVisual();
+            };
+            colorMenu.Items.Add(colorItem);
+        }
+        menu.Items.Add(colorMenu);
+
+        menu.Items.Add(new Separator());
+
+        var deleteItem = new MenuItem { Header = "Delete Icon" };
+        deleteItem.Click += (_, _) =>
+        {
+            clickedPilot.IsHidden = true;
+            InvalidateVisual();
+        };
+        menu.Items.Add(deleteItem);
+
+        this.ContextMenu = menu;
+        menu.Open(this);
+
+        e.Handled = true;
+    }
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
@@ -943,17 +1072,21 @@ public class TsdRadarControl : Control
 
         foreach (var pilot in VisiblePilots)
         {
+            if (pilot.IsHidden) continue;
+
             var pt = LatLonToScreen(
                 pilot.Lat, pilot.Lon, width, height);
             if (!IsOnScreen(pt, width, height)) continue;
 
-            var brush = new SolidColorBrush(
-                Color.Parse(pilot.MatchedFilterColor));
+            var color = pilot.ColorOverride ?? pilot.MatchedFilterColor;
+            var brush = new SolidColorBrush(Color.Parse(color));
 
             DrawAircraftSymbol(context, pt, pilot.Heading, size, brush);
 
-            if (_hoveredCallsign != null &&
-                _hoveredCallsign == pilot.Callsign)
+            // Show data block if persistent, or on hover
+            if (pilot.ShowDataBlock ||
+                (_hoveredCallsign != null &&
+                 _hoveredCallsign == pilot.Callsign))
             {
                 DrawDataBlock(context, pt, pilot,
                     _dataBlockBrush, typeface);
@@ -1015,11 +1148,15 @@ public class TsdRadarControl : Control
         {
             pilot.Callsign,
             $"{pilot.AircraftType,-4} {altStr}",
-            $"{pilot.GroundSpeed}",
-            pilot.Arrival
+            $"{pilot.GroundSpeed}"
         };
 
-        if (pilot.MatchedShowRoute &&
+        if (pilot.ShowOrgDest)
+            linesList.Add($"{pilot.Departure} → {pilot.Arrival}");
+        else
+            linesList.Add(pilot.Arrival);
+
+        if ((pilot.MatchedShowRoute || pilot.ManualShowRoute) &&
             !string.IsNullOrWhiteSpace(pilot.Route))
         {
             const int wrapWidth = 30;
@@ -1107,7 +1244,8 @@ public class TsdRadarControl : Control
     {
         foreach (var pilot in VisiblePilots)
         {
-            if (!pilot.MatchedDrawRoute) continue;
+            if (!pilot.MatchedDrawRoute && !pilot.ManualDrawRoute) continue;
+            if (pilot.IsHidden) continue;
             if (pilot.ParsedRoute is null ||
                 pilot.ParsedRoute.Count < 2) continue;
 

@@ -18,6 +18,14 @@ public class VatsimPilot
     public string MatchedFilterColor { get; set; } = "#FFFFFF";
     public bool MatchedDrawRoute { get; set; } = false;
     public bool MatchedShowRoute { get; set; } = false;
+    
+    // Per-pilot overrides (set via right-click context menu)
+    public bool ShowDataBlock { get; set; } = false;
+    public bool ShowOrgDest { get; set; } = false;
+    public bool ManualDrawRoute { get; set; } = false;
+    public bool ManualShowRoute { get; set; } = false;
+    public string? ColorOverride { get; set; }
+    public bool IsHidden { get; set; } = false;
     public List<LatLon> ParsedRoute { get; set; } = new();
 
     // Speed averaging for smoother projections

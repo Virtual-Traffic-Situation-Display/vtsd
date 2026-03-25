@@ -136,6 +136,8 @@
           <MenuItem Header="Show/Hide Flight Count"
                     FontFamily="Arial" FontSize="12"
                     Command="{Binding ToggleFlightCountCommand}"/>
+          <MenuItem Header="Restore Hidden Flights"
+                  Command="{Binding RestoreHiddenFlightsCommand}"/>  
       </MenuItem>
 
     <MenuItem Header="Alerts" Foreground="{StaticResource ForegroundPrimaryBrush}"
