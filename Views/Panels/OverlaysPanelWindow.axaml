@@ -2,6 +2,92 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:panels="using:vTFMS.Views.Panels"
+    xmlns:vm="using:vTFMS.ViewModels.Panels"
+    xmlns:models="using:vTFMS.Models"
     x:Class="vTFMS.Views.Panels.OverlaysPanelWindow"
-    Width="320" Height="240">
+    x:DataType="vm:OverlaysPanelViewModel"
+    Width="380" Height="480">
+
+  <Grid RowDefinitions="Auto,*,Auto" Margin="4">
+
+    <!-- Column headers -->
+    <Grid Grid.Row="0"
+          ColumnDefinitions="*,80,50"
+          Margin="8,4,8,0">
+      <TextBlock Grid.Column="0" Text="Overlay"
+                 FontFamily="Arial" FontSize="11" FontWeight="Bold"
+                 VerticalAlignment="Center"/>
+      <TextBlock Grid.Column="1" Text="State"
+                 FontFamily="Arial" FontSize="11" FontWeight="Bold"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      <TextBlock Grid.Column="2" Text="Label"
+                 FontFamily="Arial" FontSize="11" FontWeight="Bold"
+                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    </Grid>
+
+    <!-- Scrollable overlay rows -->
+    <ScrollViewer Grid.Row="1" Margin="0,4,0,0">
+      <ItemsControl ItemsSource="{Binding Overlays}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="models:OverlayItem">
+            <Grid ColumnDefinitions="*,80,50"
+                  Margin="8,1,8,1"
+                  IsEnabled="{Binding IsEnabled}">
+
+              <!-- Overlay name -->
+              <TextBlock Grid.Column="0"
+                         Text="{Binding Name}"
+                         FontFamily="Arial" FontSize="11"
+                         VerticalAlignment="Center"/>
+
+              <!-- State button — cycles Show → Browse → Hide -->
+              <Button Grid.Column="1"
+                      Content="{Binding StateText}"
+                      Command="{Binding CycleStateCommand}"
+                      FontFamily="Arial" FontSize="10"
+                      HorizontalAlignment="Stretch"
+                      HorizontalContentAlignment="Center"
+                      Padding="6,2"
+                      Margin="4,0"/>
+
+              <!-- Label toggle -->
+              <CheckBox Grid.Column="2"
+                        IsChecked="{Binding ShowLabel}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"/>
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+    <!-- Bottom buttons -->
+    <StackPanel Grid.Row="2"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Margin="4">
+      <Button Content="Show All"
+              Command="{Binding ShowAllCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4"/>
+      <Button Content="Hide All"
+              Command="{Binding HideAllCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4"/>
+      <Button Content="OK"
+              Command="{Binding OkCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4"/>
+      <Button Content="Apply"
+              Command="{Binding ApplyCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4"/>
+      <Button Content="Cancel"
+              Command="{Binding CancelCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4"/>
+    </StackPanel>
+
+  </Grid>
+
 </panels:BasePanelWindow>
