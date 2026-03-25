@@ -54,139 +54,206 @@
         </Style>
       </Menu.Styles>
 
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- Display Menu                                -->
+      <!-- ═══════════════════════════════════════════ -->
       <MenuItem Header="Display" Foreground="{StaticResource ForegroundPrimaryBrush}"
                 FontFamily="Arial" FontSize="13">
-        <MenuItem Header="Adapt"
-                  FontFamily="Arial" FontSize="12"
-                  Command="{Binding OpenAdaptCommand}"/>
-
+        <MenuItem Header="Show/Hide Times"
+                  IsEnabled="False"/>
+        <MenuItem Header="Adapt">
+          <MenuItem Header="Recall"
+                    IsEnabled="False"/>
+          <MenuItem Header="Save"
+                    IsEnabled="False"/>
+          <MenuItem Header="Delete"
+                    IsEnabled="False"/>
+          <MenuItem Header="Initialize"
+                    IsEnabled="False"/>
+          <MenuItem Header="Change Colors and Fonts"
+                    Command="{Binding OpenAdaptCommand}"/>
+        </MenuItem>
         <MenuItem Header="Profiles">
           <MenuItem Header="Save"
-                    FontFamily="Arial" FontSize="12"
                     IsEnabled="False"
                     Command="{Binding SaveProfileCommand}"/>
           <MenuItem Header="Save As..."
-                    FontFamily="Arial" FontSize="12"
                     IsEnabled="False"
                     Command="{Binding SaveProfileAsCommand}"/>
           <MenuItem Header="Load..."
-                    FontFamily="Arial" FontSize="12"
                     IsEnabled="False"
                     Command="{Binding LoadProfileCommand}"/>
         </MenuItem>
         <MenuItem Header="Filters">
           <MenuItem Header="Save"
-                    FontFamily="Arial" FontSize="12"
                     Command="{Binding SaveFiltersCommand}"/>
           <MenuItem Header="Save As..."
-                    FontFamily="Arial" FontSize="12"
                     Command="{Binding SaveFiltersAsCommand}"/>
           <MenuItem Header="Load..."
-                    FontFamily="Arial" FontSize="12"
                     Command="{Binding LoadFiltersCommand}"/>
         </MenuItem>
+        <MenuItem Header="Redraw"
+                  IsEnabled="False"/>
+        <MenuItem Header="Legend"
+                  IsEnabled="False"/>
+        
+        <MenuItem Header="Quit"
+                  Command="{Binding QuitCommand}"/>
       </MenuItem>
 
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- Maps Menu                                   -->
+      <!-- ═══════════════════════════════════════════ -->
       <MenuItem Header="Maps" Foreground="{StaticResource ForegroundPrimaryBrush}"
                 FontFamily="Arial" FontSize="13">
         <MenuItem Header="Move/Zoom..."
-                  FontFamily="Arial" FontSize="12"
                   Command="{Binding OpenMoveZoomCommand}"/>
         <MenuItem Header="Show Map Item..."
-                  FontFamily="Arial" FontSize="12"
                   Command="{Binding OpenShowMapItemCommand}"/>
         <MenuItem Header="Range Rings..."
-                  FontFamily="Arial" FontSize="12"
                   Command="{Binding OpenRangeRingsCommand}"/>
         <MenuItem Header="Overlays..."
-                  FontFamily="Arial" FontSize="12"
                   Command="{Binding OpenOverlaysCommand}"/>
+        
         <MenuItem Header="Runway Layout..."
-                  FontFamily="Arial" FontSize="12"
-                  Command="{Binding OpenRunwayLayoutCommand}"
                   IsEnabled="False"/>
         <MenuItem Header="DME..."
-                  FontFamily="Arial" FontSize="12"
-                  Command="{Binding OpenDmeCommand}"
                   IsEnabled="False"/>
         <MenuItem Header="Projection..."
-                  FontFamily="Arial" FontSize="12"
-                  Command="{Binding OpenProjectionCommand}"
                   IsEnabled="False"/>
       </MenuItem>
 
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- Flights Menu                                -->
+      <!-- ═══════════════════════════════════════════ -->
       <MenuItem Header="Flights" Foreground="{StaticResource ForegroundPrimaryBrush}"
                 FontFamily="Arial" FontSize="13">
-          <MenuItem Header="Enable VATSIM Data"
-                    FontFamily="Arial" FontSize="12"
-                    Command="{Binding ToggleVatsimDataCommand}"
-                    Icon="{Binding VatsimDataEnabled,
-                           Converter={StaticResource BoolToCheckConverter}}"/>
-          <MenuItem Header="Display All Aircraft"
-                    FontFamily="Arial" FontSize="12"
-                    Command="{Binding ToggleShowAllAircraftCommand}"
-                    Icon="{Binding ShowAllAircraft,
-                           Converter={StaticResource BoolToCheckConverter}}"/>
+        <MenuItem Header="Show Flights"
+                  Command="{Binding ToggleShowAllAircraftCommand}"
+                  Icon="{Binding ShowAllAircraft,
+                         Converter={StaticResource BoolToCheckConverter}}"/>
+        <MenuItem Header="Select Flights..."
+                  Command="{Binding OpenSelectFlightsCommand}"/>
+        <MenuItem Header="Show Flight Count"
+                  Command="{Binding ToggleFlightCountCommand}"/>
+        <MenuItem Header="Find Flight..."
+                  IsEnabled="False"/>
+        
+        <MenuItem Header="View Departures"
+                  IsEnabled="False"/>
+        
+        <MenuItem Header="Customize">
           <MenuItem Header="Altitude Filter..."
-                    FontFamily="Arial" FontSize="12"
                     Command="{Binding OpenAltitudeFilterCommand}"/>
-          <MenuItem Header="Select Flights..."
-                    FontFamily="Arial" FontSize="12"
-                    Command="{Binding OpenSelectFlightsCommand}"/>
-          <MenuItem Header="Show/Hide Flight Count"
-                    FontFamily="Arial" FontSize="12"
-                    Command="{Binding ToggleFlightCountCommand}"/>
-          <MenuItem Header="Restore Hidden Flights"
-                  Command="{Binding RestoreHiddenFlightsCommand}"/>  
+        </MenuItem>
+        <MenuItem Header="Restore Hidden Flights"
+                  Command="{Binding RestoreHiddenFlightsCommand}"/>
       </MenuItem>
 
-    <MenuItem Header="Alerts" Foreground="{StaticResource ForegroundPrimaryBrush}"
-              FontFamily="Arial" FontSize="13">
-        <MenuItem Header="NAS Monitor"
-          FontFamily="Arial" FontSize="12"
-          Command="{Binding OpenNasMonitorCommand}"/>
-    </MenuItem>
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- Alerts Menu                                 -->
+      <!-- ═══════════════════════════════════════════ -->
+      <MenuItem Header="Alerts" Foreground="{StaticResource ForegroundPrimaryBrush}"
+                FontFamily="Arial" FontSize="13">
+        <MenuItem Header="Show Alerts"
+                  IsEnabled="False"/>
+        <MenuItem Header="Select Alerts..."
+                  IsEnabled="False"/>
+        <MenuItem Header="Examine Alerts..."
+                  IsEnabled="False"/>
+        
+        <MenuItem Header="Alarms..."
+                  IsEnabled="False"/>
+        
+        <MenuItem Header="Show NAS Monitor">
+          <MenuItem Header="Custom"
+                    Command="{Binding OpenNasMonitorCommand}"/>
+          <MenuItem Header="ARTCC"
+                    IsEnabled="False"/>
+          <MenuItem Header="System Summary"
+                    IsEnabled="False"/>
+        </MenuItem>
+        
+        <MenuItem Header="Preferences..."
+                  IsEnabled="False"/>
+      </MenuItem>
 
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- Weather Menu                                -->
+      <!-- ═══════════════════════════════════════════ -->
       <MenuItem Header="Weather" Foreground="{StaticResource ForegroundPrimaryBrush}"
                 FontFamily="Arial" FontSize="13">
-        <MenuItem Header="Select Weather"
-                  FontFamily="Arial" FontSize="12"
+        <MenuItem Header="Show/Hide Weather"
+                  IsEnabled="False"/>
+        <MenuItem Header="Select Weather..."
                   Command="{Binding OpenSelectWeatherCommand}"/>
+        
+        <MenuItem Header="WX Report..."
+                  IsEnabled="False"/>
       </MenuItem>
 
-      <!-- FEA/FCA -->
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- FEA/FCA Menu                                -->
+      <!-- ═══════════════════════════════════════════ -->
       <MenuItem Header="FEA/FCA" Foreground="{StaticResource ForegroundPrimaryBrush}"
-                FontFamily="Arial" FontSize="13"
-                IsEnabled="False">
-        <MenuItem Header="Show/Hide FEA/FCAs"
-                  FontFamily="Arial" FontSize="12"
+                FontFamily="Arial" FontSize="13">
+        <MenuItem Header="Show FEA/FCAs"
                   IsEnabled="False"/>
         <MenuItem Header="Select FEA/FCA..."
-                  FontFamily="Arial" FontSize="12"
-                  Command="{Binding OpenSelectFeaFcaCommand}"/>
+                  IsEnabled="False"/>
         <MenuItem Header="Create FEA/FCA"
-                  FontFamily="Arial" FontSize="12"
                   IsEnabled="False"/>
         <MenuItem Header="Recall FEA/FCA File"
-                  FontFamily="Arial" FontSize="12"
                   IsEnabled="False"/>
         <MenuItem Header="Examine FEA/FCA"
-                  FontFamily="Arial" FontSize="12"
+                  IsEnabled="False"/>
+        
+        <MenuItem Header="Preferences..."
                   IsEnabled="False"/>
       </MenuItem>
 
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- Tools Menu                                  -->
+      <!-- ═══════════════════════════════════════════ -->
+      <MenuItem Header="Tools" Foreground="{StaticResource ForegroundPrimaryBrush}"
+                FontFamily="Arial" FontSize="13">
+        <MenuItem Header="Snapshot">
+          <MenuItem Header="Capture"
+                    IsEnabled="False"/>
+          <MenuItem Header="View"
+                    IsEnabled="False"/>
+          <MenuItem Header="Print"
+                    IsEnabled="False"/>
+        </MenuItem>
+        
+        <MenuItem Header="Replay"
+                  IsEnabled="False"/>
+        <MenuItem Header="Command Line"
+                  IsEnabled="False"/>
+        
+        <MenuItem Header="Identifier Lookup..."
+                  IsEnabled="False"/>
+      </MenuItem>
+
+      <!-- ═══════════════════════════════════════════ -->
+      <!-- Help Menu                                   -->
+      <!-- ═══════════════════════════════════════════ -->
       <MenuItem Header="Help" Foreground="{StaticResource ForegroundPrimaryBrush}"
-          FontFamily="Arial" FontSize="13">
+                FontFamily="Arial" FontSize="13">
         <MenuItem Header="Check for Updates"
-            FontFamily="Arial" FontSize="12"
-            Command="{Binding CheckForUpdatesCommand}"/>
+                  Command="{Binding CheckForUpdatesCommand}"/>
         <MenuItem Header="About..."
-            FontFamily="Arial" FontSize="12"
-            Command="{Binding OpenAboutCommand}"/>
+                  Command="{Binding OpenAboutCommand}"/>
+        
+        <MenuItem Header="Documentation"
+                  IsEnabled="False"/>
+        <MenuItem Header="Keyboard Shortcuts"
+                  IsEnabled="False"/>
+        
+        <MenuItem Header="Report a Bug"
+                  IsEnabled="False"/>
       </MenuItem>
     </Menu>
-
-    
 
     <!-- TSD fills the main window -->
     <views:TsdView Grid.Row="1"
@@ -198,23 +265,30 @@
             Padding="8,3">
       <Grid ColumnDefinitions="Auto,*,Auto">
 
-        <Image Grid.Column="0"
-           Source="avares://vTFMS/Assets/vatsim-logo.png"
-           Height="20"
-           Margin="0,0,8,0"
-           VerticalAlignment="Center"
-           Opacity="{Binding VatsimDataEnabled,
-                     Converter={StaticResource BoolToOpacityConverter}}"
-           ToolTip.Tip="{Binding VatsimDataEnabled,
-                         Converter={StaticResource BoolToVatsimTipConverter}}"/>
+        <!-- Clickable VATSIM logo — toggles data on/off -->
+        <Button Grid.Column="0"
+                Command="{Binding ToggleVatsimDataCommand}"
+                Background="Transparent"
+                BorderThickness="0"
+                Padding="0"
+                Cursor="Hand"
+                ToolTip.Tip="{Binding VatsimDataEnabled,
+                              Converter={StaticResource BoolToVatsimTipConverter}}">
+          <Image Source="avares://vTFMS/Assets/vatsim-logo.png"
+                 Height="20"
+                 Margin="0,0,8,0"
+                 VerticalAlignment="Center"
+                 Opacity="{Binding VatsimDataEnabled,
+                           Converter={StaticResource BoolToOpacityConverter}}"/>
+        </Button>
 
         <TextBlock Grid.Column="1"
-           Text="{Binding AppVersion, StringFormat='v{0}'}"
-           Foreground="{StaticResource ForegroundPrimaryBrush}"
-           FontFamily="Arial"
-           FontSize="10"
-           HorizontalAlignment="Center"
-           VerticalAlignment="Center"/>
+                   Text="{Binding AppVersion, StringFormat='v{0}'}"
+                   Foreground="{StaticResource ForegroundPrimaryBrush}"
+                   FontFamily="Arial"
+                   FontSize="10"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"/>
 
         <TextBlock Grid.Column="2"
                    Text="{Binding CurrentTime}"

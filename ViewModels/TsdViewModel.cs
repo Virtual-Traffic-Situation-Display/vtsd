@@ -81,7 +81,7 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _vatsimConnected = false;
 
-    private bool _vatsimDataEnabled;
+    private bool _vatsimDataEnabled = true;
     public bool VatsimDataEnabled
     {
         get => _vatsimDataEnabled;
