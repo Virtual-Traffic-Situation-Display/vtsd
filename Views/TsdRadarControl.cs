@@ -830,6 +830,11 @@ public class TsdRadarControl : Control
 
         switch (e.Key)
         {
+            case Key.A:
+                ShowArtcc = !ShowArtcc;
+                e.Handled = true;
+                break;
+            
             case Key.B:
                 bool boundariesOn = ShowStateBoundaries || ShowCountryBoundaries;
                 ShowStateBoundaries = !boundariesOn;
@@ -846,6 +851,21 @@ public class TsdRadarControl : Control
             case Key.F:
                 ShowAllAircraft = !ShowAllAircraft;
                 e.Handled = true;
+                break;
+
+            case Key.I:
+                _prevCenterLat = CenterLat;
+                _prevCenterLon = CenterLon;
+                _prevZoomLevel = ZoomLevel;
+
+                CenterLat = 38.5;
+                CenterLon = -96.0;
+                ZoomLevel = 4.0;
+                ShowStateBoundaries = true;
+                ShowCountryBoundaries = true;
+
+                e.Handled = true;
+                ScheduleRadarRefresh();
                 break;
             
             case Key.M:
