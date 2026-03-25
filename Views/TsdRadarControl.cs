@@ -830,6 +830,24 @@ public class TsdRadarControl : Control
 
         switch (e.Key)
         {
+            case Key.B:
+                bool boundariesOn = ShowStateBoundaries || ShowCountryBoundaries;
+                ShowStateBoundaries = !boundariesOn;
+                ShowCountryBoundaries = !boundariesOn;
+                e.Handled = true;
+                break;
+
+            case Key.D:
+                _geometriesDirty = true;
+                InvalidateVisual();
+                e.Handled = true;
+                break;
+
+            case Key.F:
+                ShowAllAircraft = !ShowAllAircraft;
+                e.Handled = true;
+                break;
+            
             case Key.M:
                 // Save undo state
                 _prevCenterLat = CenterLat;
@@ -852,16 +870,6 @@ public class TsdRadarControl : Control
                 ScheduleRadarRefresh();
                 break;
 
-            case Key.Z:
-                _prevCenterLat = CenterLat;
-                _prevCenterLon = CenterLon;
-                _prevZoomLevel = ZoomLevel;
-
-                ZoomLevel = Math.Clamp(ZoomLevel * 1.25, 0.25, 20.0);
-                e.Handled = true;
-                ScheduleRadarRefresh();
-                break;
-
             case Key.U:
                 _prevCenterLat = CenterLat;
                 _prevCenterLon = CenterLon;
@@ -870,6 +878,13 @@ public class TsdRadarControl : Control
                 ZoomLevel = Math.Clamp(ZoomLevel / 1.25, 0.25, 20.0);
                 e.Handled = true;
                 ScheduleRadarRefresh();
+                break;
+            
+            case Key.W:
+                ShowWeather = !ShowWeather;
+                if (ShowWeather)
+                    ScheduleRadarRefresh();
+                e.Handled = true;
                 break;
 
             case Key.X:
@@ -889,22 +904,14 @@ public class TsdRadarControl : Control
                 ScheduleRadarRefresh();
                 break;
 
-            case Key.W:
-                ShowWeather = !ShowWeather;
-                if (ShowWeather)
-                    ScheduleRadarRefresh();
-                e.Handled = true;
-                break;
+            case Key.Z:
+                _prevCenterLat = CenterLat;
+                _prevCenterLon = CenterLon;
+                _prevZoomLevel = ZoomLevel;
 
-            case Key.F:
-                ShowAllAircraft = !ShowAllAircraft;
+                ZoomLevel = Math.Clamp(ZoomLevel * 1.25, 0.25, 20.0);
                 e.Handled = true;
-                break;
-
-            case Key.D:
-                _geometriesDirty = true;
-                InvalidateVisual();
-                e.Handled = true;
+                ScheduleRadarRefresh();
                 break;
         }
     }
