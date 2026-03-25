@@ -56,6 +56,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowAllAircraft));
     }
 
+    [RelayCommand]
+    private void RestoreHiddenFlights()
+    {
+        foreach (var pilot in TsdViewModel.AllCurrentPilots)
+            pilot.IsHidden = false;
+
+        foreach (var pilot in TsdViewModel.VisiblePilots)
+            pilot.IsHidden = false;
+    }
+
     public bool ShowAllAircraft => TsdViewModel.ShowAllAircraft;
 
     [RelayCommand]

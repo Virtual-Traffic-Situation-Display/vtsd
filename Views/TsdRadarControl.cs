@@ -14,11 +14,18 @@ namespace vTFMS.Views;
 
 public class TsdRadarControl : Control
 {
+    // =========================================================================
+    // Constants
+    // =========================================================================
+
     // Lambert Conformal Conic standard parallels for US
     private const double Phi1 = 33.0 * Math.PI / 180.0;
     private const double Phi2 = 45.0 * Math.PI / 180.0;
 
-    // Cached polyline geometries
+    // =========================================================================
+    // Cached geometry state
+    // =========================================================================
+
     private Geometry? _stateBoundaryGeometry;
     private Geometry? _countryBoundaryGeometry;
     private Geometry? _sectorGeometry;
@@ -32,17 +39,32 @@ public class TsdRadarControl : Control
     private double _cachedWidth;
     private double _cachedHeight;
 
-    private System.Threading.Timer? _radarRefreshTimer;
-    private double _prevCenterLat;
-    private double _prevCenterLon;
-    private double _prevZoomLevel;
+    // =========================================================================
+    // Interaction state
+    // =========================================================================
+
     private Point _currentMousePosition;
     private VatsimPilot? _hoveredPilot;
     private string? _hoveredCallsign;
 
+    // Undo state for move/zoom
+    private double _prevCenterLat;
+    private double _prevCenterLon;
+    private double _prevZoomLevel;
+
+    // =========================================================================
+    // Timers
+    // =========================================================================
+
+    private Timer? _radarRefreshTimer;
+
+    // =========================================================================
+    // Cached render objects
+    // =========================================================================
+
     private Avalonia.Media.Imaging.Bitmap? _radarBitmap;
 
-    // Cached render objects
+    // Brushes and pens — rebuilt when DisplaySettings changes
     private SolidColorBrush _backgroundBrush = new(Colors.Black);
     private Pen _boundaryPen = new(new SolidColorBrush(Colors.White), 0.8);
     private Pen _sectorPen = new(new SolidColorBrush(Colors.Gray), 1.0);
@@ -63,7 +85,26 @@ public class TsdRadarControl : Control
     private SolidColorBrush _dataBlockBrush = new(Colors.Cyan);
     private SolidColorBrush _mapLabelBrush = new(Colors.Cyan);
 
+    // =========================================================================
+    // Events
+    // =========================================================================
+
+    /// <summary>Raised after a move/zoom to trigger weather radar refresh.</summary>
     public event EventHandler? RadarRefreshRequested;
+
+    /// <summary>Raised when a flight's route needs on-demand resolution.</summary>
+    public event EventHandler<VatsimPilot>? RouteResolveRequested;
+
+    /// <summary>Raised when a map item should be removed via context menu.</summary>
+    public event EventHandler<MapItem>? MapItemRemoveRequested;
+
+    /// <summary>Raised when the generic context menu requests a panel command
+    /// (e.g. "SelectFlights", "ShowMapItem", "RangeRings").</summary>
+    public event EventHandler<string>? GenericMenuCommandRequested;
+
+    // =========================================================================
+    // Styled Properties
+    // =========================================================================
 
     #region Styled Properties
 
@@ -211,6 +252,10 @@ public class TsdRadarControl : Control
             nameof(ShowAllAircraft), false);
 
     #endregion
+
+    // =========================================================================
+    // CLR Property Wrappers
+    // =========================================================================
 
     #region CLR Property Wrappers
 
@@ -390,6 +435,10 @@ public class TsdRadarControl : Control
 
     #endregion
 
+    // =========================================================================
+    // Static constructor — render invalidation
+    // =========================================================================
+
     static TsdRadarControl()
     {
         AffectsRender<TsdRadarControl>(
@@ -419,15 +468,19 @@ public class TsdRadarControl : Control
             RangeRingsProperty);
     }
 
+    // =========================================================================
+    // Constructor
+    // =========================================================================
+
     public TsdRadarControl()
     {
         Focusable = true;
         RebuildRenderCache();
     }
 
-    // -------------------------------------------------------------------------
-    // Lambert Conformal Conic projection
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // Projection — Lambert Conformal Conic
+    // =========================================================================
 
     private static (double x, double y) LccProject(
         double lat, double lon,
@@ -502,6 +555,10 @@ public class TsdRadarControl : Control
         return pt.X >= -20 && pt.X <= width + 20 &&
                pt.Y >= -20 && pt.Y <= height + 20;
     }
+
+    // =========================================================================
+    // Property change handling
+    // =========================================================================
 
     protected override void OnPropertyChanged(
         AvaloniaPropertyChangedEventArgs change)
@@ -582,6 +639,481 @@ public class TsdRadarControl : Control
         _geometriesDirty = true;
         InvalidateVisual();
     }
+
+    // =========================================================================
+    // Input — Pointer (hover, right-click context menus)
+    // =========================================================================
+
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+        _currentMousePosition = e.GetPosition(this);
+
+        var prevCallsign = _hoveredCallsign;
+        _hoveredCallsign = null;
+        _hoveredPilot = null;
+
+        foreach (var pilot in VisiblePilots)
+        {
+            var pt = LatLonToScreen(pilot.Lat, pilot.Lon,
+                Bounds.Width, Bounds.Height);
+            double dx = _currentMousePosition.X - pt.X;
+            double dy = _currentMousePosition.Y - pt.Y;
+
+            if (Math.Sqrt(dx * dx + dy * dy) <= 8.0)
+            {
+                _hoveredPilot = pilot;
+                _hoveredCallsign = pilot.Callsign;
+                break;
+            }
+        }
+
+        if (_hoveredCallsign != prevCallsign)
+            InvalidateVisual();
+    }
+
+    protected override void OnPointerEntered(PointerEventArgs e)
+    {
+        base.OnPointerEntered(e);
+        Focus();
+    }
+
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+
+        var point = e.GetCurrentPoint(this);
+        if (!point.Properties.IsRightButtonPressed) return;
+
+        var clickPos = point.Position;
+        var width = Bounds.Width;
+        var height = Bounds.Height;
+
+        // ── Hit-test 1: Flight icons ─────────────────────────
+        foreach (var pilot in VisiblePilots)
+        {
+            if (pilot.IsHidden) continue;
+            var pt = LatLonToScreen(pilot.Lat, pilot.Lon, width, height);
+            double dx = clickPos.X - pt.X;
+            double dy = clickPos.Y - pt.Y;
+
+            if (Math.Sqrt(dx * dx + dy * dy) <= 10.0)
+            {
+                ShowFlightContextMenu(pilot);
+                e.Handled = true;
+                return;
+            }
+        }
+
+        // ── Hit-test 2: Active map items ─────────────────────
+        foreach (var item in ActiveMapItems)
+        {
+            var pt = LatLonToScreen(item.Lat, item.Lon, width, height);
+            double dx = clickPos.X - pt.X;
+            double dy = clickPos.Y - pt.Y;
+
+            if (Math.Sqrt(dx * dx + dy * dy) <= 12.0)
+            {
+                ShowMapItemContextMenu(item);
+                e.Handled = true;
+                return;
+            }
+        }
+
+        // ── Hit-test 3: Empty space (generic) ────────────────
+        ShowGenericContextMenu(clickPos);
+        e.Handled = true;
+    }
+
+    // =========================================================================
+    // Context menus
+    // =========================================================================
+
+    /// <summary>Context menu for right-clicking a flight icon.</summary>
+    private void ShowFlightContextMenu(VatsimPilot pilot)
+    {
+        var menu = new ContextMenu();
+
+        var dataBlockItem = new MenuItem
+        {
+            Header = pilot.ShowDataBlock
+                ? "Hide Data Block" : "Show Data Block"
+        };
+        dataBlockItem.Click += (_, _) =>
+        {
+            pilot.ShowDataBlock = !pilot.ShowDataBlock;
+            InvalidateVisual();
+        };
+        menu.Items.Add(dataBlockItem);
+
+        var orgDestItem = new MenuItem
+        {
+            Header = pilot.ShowOrgDest
+                ? "Hide Org/Dest" : "Show Org/Dest"
+        };
+        orgDestItem.Click += (_, _) =>
+        {
+            pilot.ShowOrgDest = !pilot.ShowOrgDest;
+            InvalidateVisual();
+        };
+        menu.Items.Add(orgDestItem);
+
+        var drawRouteItem = new MenuItem
+        {
+            Header = (pilot.ManualDrawRoute || pilot.MatchedDrawRoute)
+                ? "Hide Route" : "Draw Route"
+        };
+        drawRouteItem.Click += (_, _) =>
+        {
+            pilot.ManualDrawRoute = !pilot.ManualDrawRoute;
+            if (pilot.ManualDrawRoute &&
+                pilot.ParsedRoute.Count == 0 &&
+                !string.IsNullOrWhiteSpace(pilot.Route))
+            {
+                RouteResolveRequested?.Invoke(this, pilot);
+            }
+            InvalidateVisual();
+        };
+        menu.Items.Add(drawRouteItem);
+
+        var showRouteItem = new MenuItem
+        {
+            Header = (pilot.ManualShowRoute || pilot.MatchedShowRoute)
+                ? "Hide Route Text" : "Show Route Text"
+        };
+        showRouteItem.Click += (_, _) =>
+        {
+            pilot.ManualShowRoute = !pilot.ManualShowRoute;
+            InvalidateVisual();
+        };
+        menu.Items.Add(showRouteItem);
+
+        // Color submenu
+        var colorMenu = new MenuItem { Header = "Change Color" };
+        var colors = new Dictionary<string, string>
+        {
+            { "White",   "#FFFFFF" },
+            { "Cyan",    "#00FFFF" },
+            { "Green",   "#00FF00" },
+            { "Yellow",  "#FFFF00" },
+            { "Orange",  "#FFA500" },
+            { "Red",     "#FF0000" },
+            { "Magenta", "#FF00FF" },
+            { "Reset",   "" }
+        };
+
+        foreach (var (name, hex) in colors)
+        {
+            var colorItem = new MenuItem { Header = name };
+            var capturedHex = hex;
+            colorItem.Click += (_, _) =>
+            {
+                pilot.ColorOverride =
+                    string.IsNullOrEmpty(capturedHex) ? null : capturedHex;
+                InvalidateVisual();
+            };
+            colorMenu.Items.Add(colorItem);
+        }
+        menu.Items.Add(colorMenu);
+
+        menu.Items.Add(new Separator());
+
+        var deleteItem = new MenuItem { Header = "Delete Icon" };
+        deleteItem.Click += (_, _) =>
+        {
+            pilot.IsHidden = true;
+            InvalidateVisual();
+        };
+        menu.Items.Add(deleteItem);
+
+        this.ContextMenu = menu;
+        menu.Open(this);
+    }
+
+    /// <summary>Context menu for right-clicking an active map item.</summary>
+    private void ShowMapItemContextMenu(MapItem item)
+    {
+        var menu = new ContextMenu();
+
+        var labelItem = new MenuItem
+        {
+            Header = item.ShowLabel ? "Hide Label" : "Show Label"
+        };
+        labelItem.Click += (_, _) =>
+        {
+            item.ShowLabel = !item.ShowLabel;
+            InvalidateVisual();
+        };
+        menu.Items.Add(labelItem);
+
+        var centerItem = new MenuItem { Header = "Center On" };
+        centerItem.Click += (_, _) =>
+        {
+            _prevCenterLat = CenterLat;
+            _prevCenterLon = CenterLon;
+            _prevZoomLevel = ZoomLevel;
+
+            CenterLat = item.Lat;
+            CenterLon = item.Lon;
+            ScheduleRadarRefresh();
+        };
+        menu.Items.Add(centerItem);
+
+        menu.Items.Add(new Separator());
+
+        var removeItem = new MenuItem { Header = "Remove Item" };
+        removeItem.Click += (_, _) =>
+        {
+            MapItemRemoveRequested?.Invoke(this, item);
+        };
+        menu.Items.Add(removeItem);
+
+        this.ContextMenu = menu;
+        menu.Open(this);
+    }
+
+    /// <summary>Context menu for right-clicking empty radar space.</summary>
+    private void ShowGenericContextMenu(Point clickPos)
+    {
+        var menu = new ContextMenu();
+
+        var centerItem = new MenuItem { Header = "Center Here" };
+        centerItem.Click += (_, _) =>
+        {
+            _prevCenterLat = CenterLat;
+            _prevCenterLon = CenterLon;
+            _prevZoomLevel = ZoomLevel;
+
+            var width = Bounds.Width;
+            var height = Bounds.Height;
+            double scale = Math.Min(width, height) * 0.45 * ZoomLevel;
+
+            double dxProj = (clickPos.X - width / 2.0)
+                * (Math.PI / 180.0) * 57.0 / scale;
+            double dyProj = (clickPos.Y - height / 2.0)
+                * (Math.PI / 180.0) * 57.0 / scale;
+
+            var (newLat, newLon) = LccInverse(
+                dxProj, -dyProj, CenterLat, CenterLon);
+
+            CenterLat = newLat;
+            CenterLon = newLon;
+            ScheduleRadarRefresh();
+        };
+        menu.Items.Add(centerItem);
+
+        var undoItem = new MenuItem { Header = "Undo Move/Zoom" };
+        undoItem.Click += (_, _) =>
+        {
+            var tempLat = CenterLat;
+            var tempLon = CenterLon;
+            var tempZoom = ZoomLevel;
+
+            CenterLat = _prevCenterLat;
+            CenterLon = _prevCenterLon;
+            ZoomLevel = _prevZoomLevel;
+
+            _prevCenterLat = tempLat;
+            _prevCenterLon = tempLon;
+            _prevZoomLevel = tempZoom;
+
+            ScheduleRadarRefresh();
+        };
+        menu.Items.Add(undoItem);
+
+        menu.Items.Add(new Separator());
+
+        var selectFlightsItem = new MenuItem { Header = "Select Flights..." };
+        selectFlightsItem.Click += (_, _) =>
+            GenericMenuCommandRequested?.Invoke(this, "SelectFlights");
+        menu.Items.Add(selectFlightsItem);
+
+        var showMapItem = new MenuItem { Header = "Show Map Item..." };
+        showMapItem.Click += (_, _) =>
+            GenericMenuCommandRequested?.Invoke(this, "ShowMapItem");
+        menu.Items.Add(showMapItem);
+
+        var rangeRingsItem = new MenuItem { Header = "Range Rings..." };
+        rangeRingsItem.Click += (_, _) =>
+            GenericMenuCommandRequested?.Invoke(this, "RangeRings");
+        menu.Items.Add(rangeRingsItem);
+
+        this.ContextMenu = menu;
+        menu.Open(this);
+    }
+
+    // =========================================================================
+    // Input — Keyboard (quick keys)
+    // =========================================================================
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+
+        var width = Bounds.Width;
+        var height = Bounds.Height;
+
+        switch (e.Key)
+        {
+            case Key.A:
+                ShowArtcc = !ShowArtcc;
+                e.Handled = true;
+                break;
+
+            case Key.B:
+                bool boundariesOn = ShowStateBoundaries || ShowCountryBoundaries;
+                ShowStateBoundaries = !boundariesOn;
+                ShowCountryBoundaries = !boundariesOn;
+                e.Handled = true;
+                break;
+
+            case Key.D:
+                _geometriesDirty = true;
+                InvalidateVisual();
+                e.Handled = true;
+                break;
+
+            case Key.F:
+                ShowAllAircraft = !ShowAllAircraft;
+                e.Handled = true;
+                break;
+
+            case Key.I:
+                _prevCenterLat = CenterLat;
+                _prevCenterLon = CenterLon;
+                _prevZoomLevel = ZoomLevel;
+
+                CenterLat = 38.5;
+                CenterLon = -96.0;
+                ZoomLevel = 4.0;
+                ShowStateBoundaries = true;
+                ShowCountryBoundaries = true;
+
+                e.Handled = true;
+                ScheduleRadarRefresh();
+                break;
+
+            case Key.M:
+                _prevCenterLat = CenterLat;
+                _prevCenterLon = CenterLon;
+                _prevZoomLevel = ZoomLevel;
+
+                double scale = Math.Min(width, height) * 0.45 * ZoomLevel;
+
+                double dxProj = (_currentMousePosition.X - width / 2.0)
+                    * (Math.PI / 180.0) * 57.0 / scale;
+                double dyProj = (_currentMousePosition.Y - height / 2.0)
+                    * (Math.PI / 180.0) * 57.0 / scale;
+
+                var (newLat, newLon) = LccInverse(
+                    dxProj, -dyProj, CenterLat, CenterLon);
+
+                CenterLat = newLat;
+                CenterLon = newLon;
+                e.Handled = true;
+                ScheduleRadarRefresh();
+                break;
+
+            case Key.U:
+                _prevCenterLat = CenterLat;
+                _prevCenterLon = CenterLon;
+                _prevZoomLevel = ZoomLevel;
+
+                ZoomLevel = Math.Clamp(ZoomLevel / 1.25, 0.25, 20.0);
+                e.Handled = true;
+                ScheduleRadarRefresh();
+                break;
+
+            case Key.W:
+                ShowWeather = !ShowWeather;
+                if (ShowWeather)
+                    ScheduleRadarRefresh();
+                e.Handled = true;
+                break;
+
+            case Key.X:
+                var tempLat = CenterLat;
+                var tempLon = CenterLon;
+                var tempZoom = ZoomLevel;
+
+                CenterLat = _prevCenterLat;
+                CenterLon = _prevCenterLon;
+                ZoomLevel = _prevZoomLevel;
+
+                _prevCenterLat = tempLat;
+                _prevCenterLon = tempLon;
+                _prevZoomLevel = tempZoom;
+
+                e.Handled = true;
+                ScheduleRadarRefresh();
+                break;
+
+            case Key.Z:
+                _prevCenterLat = CenterLat;
+                _prevCenterLon = CenterLon;
+                _prevZoomLevel = ZoomLevel;
+
+                ZoomLevel = Math.Clamp(ZoomLevel * 1.25, 0.25, 20.0);
+                e.Handled = true;
+                ScheduleRadarRefresh();
+                break;
+        }
+    }
+
+    // =========================================================================
+    // Weather radar refresh scheduling
+    // =========================================================================
+
+    private void ScheduleRadarRefresh()
+    {
+        if (!ShowWeather) return;
+
+        _radarRefreshTimer?.Dispose();
+        _radarRefreshTimer = new Timer(_ =>
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                RadarRefreshRequested?.Invoke(this, EventArgs.Empty));
+        }, null, TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
+    }
+
+    // =========================================================================
+    // Render cache — rebuilds brushes/pens from DisplaySettings
+    // =========================================================================
+
+    private void RebuildRenderCache()
+    {
+        var s = DisplaySettings;
+
+        _backgroundBrush = new SolidColorBrush(
+            Color.Parse(s.BackgroundColor));
+        _boundaryPen = new Pen(
+            new SolidColorBrush(Color.Parse(s.BoundaryColor)), 0.8);
+        _sectorPen = new Pen(
+            new SolidColorBrush(Color.Parse(s.TraconColor)), 1.0);
+        _artccPen = new Pen(
+            new SolidColorBrush(Color.Parse(s.ArtccColor)), 1.5);
+        _jetRoutePen = new Pen(
+            new SolidColorBrush(Color.Parse(s.JetRoutesColor)), 0.8);
+        _victorRoutePen = new Pen(
+            new SolidColorBrush(Color.Parse(s.VictorRoutesColor)), 0.8);
+        _airportBrush = new SolidColorBrush(Color.Parse(s.AirportColor));
+        _vorBrush = new SolidColorBrush(Color.Parse(s.VorColor));
+        _vorPen = new Pen(_vorBrush, 1.0);
+        _ndbBrush = new SolidColorBrush(Color.Parse(s.NdbColor));
+        _ndbPen = new Pen(_ndbBrush, 1.0);
+        _fixBrush = new SolidColorBrush(Color.Parse(s.FixColor));
+        _fixPen = new Pen(_fixBrush, 0.8);
+        _traconBrush = new SolidColorBrush(Color.Parse(s.TraconColor));
+        _traconPen = new Pen(_traconBrush, 1.0);
+        _dataBlockBrush = new SolidColorBrush(Color.Parse(s.DataBlockColor));
+        _mapLabelBrush = new SolidColorBrush(Color.Parse(s.MapLabelColor));
+        _dataBlockTypeface = new Typeface(s.DataBlockFont);
+        _mapLabelTypeface = new Typeface(s.MapLabelFont);
+    }
+
+    // =========================================================================
+    // Geometry building
+    // =========================================================================
 
     private void RebuildGeometries(double width, double height)
     {
@@ -686,36 +1218,9 @@ public class TsdRadarControl : Control
         return geo;
     }
 
-    private void RebuildRenderCache()
-    {
-        var s = DisplaySettings;
-
-        _backgroundBrush = new SolidColorBrush(
-            Color.Parse(s.BackgroundColor));
-        _boundaryPen = new Pen(
-            new SolidColorBrush(Color.Parse(s.BoundaryColor)), 0.8);
-        _sectorPen = new Pen(
-            new SolidColorBrush(Color.Parse(s.TraconColor)), 1.0);
-        _artccPen = new Pen(
-            new SolidColorBrush(Color.Parse(s.ArtccColor)), 1.5);
-        _jetRoutePen = new Pen(
-            new SolidColorBrush(Color.Parse(s.JetRoutesColor)), 0.8);
-        _victorRoutePen = new Pen(
-            new SolidColorBrush(Color.Parse(s.VictorRoutesColor)), 0.8);
-        _airportBrush = new SolidColorBrush(Color.Parse(s.AirportColor));
-        _vorBrush = new SolidColorBrush(Color.Parse(s.VorColor));
-        _vorPen = new Pen(_vorBrush, 1.0);
-        _ndbBrush = new SolidColorBrush(Color.Parse(s.NdbColor));
-        _ndbPen = new Pen(_ndbBrush, 1.0);
-        _fixBrush = new SolidColorBrush(Color.Parse(s.FixColor));
-        _fixPen = new Pen(_fixBrush, 0.8);
-        _traconBrush = new SolidColorBrush(Color.Parse(s.TraconColor));
-        _traconPen = new Pen(_traconBrush, 1.0);
-        _dataBlockBrush = new SolidColorBrush(Color.Parse(s.DataBlockColor));
-        _mapLabelBrush = new SolidColorBrush(Color.Parse(s.MapLabelColor));
-        _dataBlockTypeface = new Typeface(s.DataBlockFont);
-        _mapLabelTypeface = new Typeface(s.MapLabelFont);
-    }
+    // =========================================================================
+    // Render — main entry point
+    // =========================================================================
 
     public override void Render(DrawingContext context)
     {
@@ -723,9 +1228,11 @@ public class TsdRadarControl : Control
         var height = Bounds.Height;
         if (width <= 0 || height <= 0) return;
 
+        // Background
         context.FillRectangle(
             _backgroundBrush, new Rect(0, 0, width, height));
 
+        // Rebuild cached geometries if stale
         if (_geometriesDirty ||
             Math.Abs(_cachedWidth - width) > 0.5 ||
             Math.Abs(_cachedHeight - height) > 0.5)
@@ -733,6 +1240,7 @@ public class TsdRadarControl : Control
             RebuildGeometries(width, height);
         }
 
+        // Boundaries
         if (ShowStateBoundaries && _stateBoundaryGeometry != null)
             context.DrawGeometry(
                 null, _boundaryPen, _stateBoundaryGeometry);
@@ -744,6 +1252,7 @@ public class TsdRadarControl : Control
         if (_sectorGeometry != null)
             context.DrawGeometry(null, _sectorPen, _sectorGeometry);
 
+        // Weather radar overlay
         if (ShowWeather && _radarBitmap != null)
         {
             var topLeft = LatLonToScreen(
@@ -766,175 +1275,21 @@ public class TsdRadarControl : Control
             }
         }
 
+        // ARTCC boundaries
         if (ShowArtcc && _artccBoundaryGeometry != null)
             context.DrawGeometry(null, _artccPen, _artccBoundaryGeometry);
 
+        // Overlays and flights
         DrawRangeRings(context, width, height);
         DrawRoutes(context, width, height);
         DrawActiveMapItems(context, width, height);
         DrawAircraft(context, width, height);
     }
 
-    private void ScheduleRadarRefresh()
-    {
-        if (!ShowWeather) return;
+    // =========================================================================
+    // Draw — Aircraft and data blocks
+    // =========================================================================
 
-        _radarRefreshTimer?.Dispose();
-        _radarRefreshTimer = new System.Threading.Timer(_ =>
-        {
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                RadarRefreshRequested?.Invoke(this, EventArgs.Empty));
-        }, null, TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
-    }
-
-    protected override void OnPointerMoved(PointerEventArgs e)
-    {
-        base.OnPointerMoved(e);
-        _currentMousePosition = e.GetPosition(this);
-
-        var prevCallsign = _hoveredCallsign;
-        _hoveredCallsign = null;
-        _hoveredPilot = null;
-
-        foreach (var pilot in VisiblePilots)
-        {
-            var pt = LatLonToScreen(pilot.Lat, pilot.Lon,
-                Bounds.Width, Bounds.Height);
-            double dx = _currentMousePosition.X - pt.X;
-            double dy = _currentMousePosition.Y - pt.Y;
-
-            if (Math.Sqrt(dx * dx + dy * dy) <= 8.0)
-            {
-                _hoveredPilot = pilot;
-                _hoveredCallsign = pilot.Callsign;
-                break;
-            }
-        }
-
-        if (_hoveredCallsign != prevCallsign)
-            InvalidateVisual();
-    }
-
-    protected override void OnPointerEntered(PointerEventArgs e)
-    {
-        base.OnPointerEntered(e);
-        Focus();
-    }
-
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        base.OnKeyDown(e);
-
-        var width = Bounds.Width;
-        var height = Bounds.Height;
-
-        switch (e.Key)
-        {
-            case Key.A:
-                ShowArtcc = !ShowArtcc;
-                e.Handled = true;
-                break;
-            
-            case Key.B:
-                bool boundariesOn = ShowStateBoundaries || ShowCountryBoundaries;
-                ShowStateBoundaries = !boundariesOn;
-                ShowCountryBoundaries = !boundariesOn;
-                e.Handled = true;
-                break;
-
-            case Key.D:
-                _geometriesDirty = true;
-                InvalidateVisual();
-                e.Handled = true;
-                break;
-
-            case Key.F:
-                ShowAllAircraft = !ShowAllAircraft;
-                e.Handled = true;
-                break;
-
-            case Key.I:
-                _prevCenterLat = CenterLat;
-                _prevCenterLon = CenterLon;
-                _prevZoomLevel = ZoomLevel;
-
-                CenterLat = 38.5;
-                CenterLon = -96.0;
-                ZoomLevel = 4.0;
-                ShowStateBoundaries = true;
-                ShowCountryBoundaries = true;
-
-                e.Handled = true;
-                ScheduleRadarRefresh();
-                break;
-            
-            case Key.M:
-                // Save undo state
-                _prevCenterLat = CenterLat;
-                _prevCenterLon = CenterLon;
-                _prevZoomLevel = ZoomLevel;
-
-                double scale = Math.Min(width, height) * 0.45 * ZoomLevel;
-
-                double dxProj = (_currentMousePosition.X - width / 2.0)
-                    * (Math.PI / 180.0) * 57.0 / scale;
-                double dyProj = (_currentMousePosition.Y - height / 2.0)
-                    * (Math.PI / 180.0) * 57.0 / scale;
-
-                var (newLat, newLon) = LccInverse(
-                    dxProj, -dyProj, CenterLat, CenterLon);
-
-                CenterLat = newLat;
-                CenterLon = newLon;
-                e.Handled = true;
-                ScheduleRadarRefresh();
-                break;
-
-            case Key.U:
-                _prevCenterLat = CenterLat;
-                _prevCenterLon = CenterLon;
-                _prevZoomLevel = ZoomLevel;
-
-                ZoomLevel = Math.Clamp(ZoomLevel / 1.25, 0.25, 20.0);
-                e.Handled = true;
-                ScheduleRadarRefresh();
-                break;
-            
-            case Key.W:
-                ShowWeather = !ShowWeather;
-                if (ShowWeather)
-                    ScheduleRadarRefresh();
-                e.Handled = true;
-                break;
-
-            case Key.X:
-                var tempLat = CenterLat;
-                var tempLon = CenterLon;
-                var tempZoom = ZoomLevel;
-
-                CenterLat = _prevCenterLat;
-                CenterLon = _prevCenterLon;
-                ZoomLevel = _prevZoomLevel;
-
-                _prevCenterLat = tempLat;
-                _prevCenterLon = tempLon;
-                _prevZoomLevel = tempZoom;
-
-                e.Handled = true;
-                ScheduleRadarRefresh();
-                break;
-
-            case Key.Z:
-                _prevCenterLat = CenterLat;
-                _prevCenterLon = CenterLon;
-                _prevZoomLevel = ZoomLevel;
-
-                ZoomLevel = Math.Clamp(ZoomLevel * 1.25, 0.25, 20.0);
-                e.Handled = true;
-                ScheduleRadarRefresh();
-                break;
-        }
-    }
     private void DrawAircraft(DrawingContext context,
                                double width, double height)
     {
@@ -943,17 +1298,21 @@ public class TsdRadarControl : Control
 
         foreach (var pilot in VisiblePilots)
         {
+            if (pilot.IsHidden) continue;
+
             var pt = LatLonToScreen(
                 pilot.Lat, pilot.Lon, width, height);
             if (!IsOnScreen(pt, width, height)) continue;
 
-            var brush = new SolidColorBrush(
-                Color.Parse(pilot.MatchedFilterColor));
+            var color = pilot.ColorOverride ?? pilot.MatchedFilterColor;
+            var brush = new SolidColorBrush(Color.Parse(color));
 
             DrawAircraftSymbol(context, pt, pilot.Heading, size, brush);
 
-            if (_hoveredCallsign != null &&
-                _hoveredCallsign == pilot.Callsign)
+            // Show data block if persistent, or on hover
+            if (pilot.ShowDataBlock ||
+                (_hoveredCallsign != null &&
+                 _hoveredCallsign == pilot.Callsign))
             {
                 DrawDataBlock(context, pt, pilot,
                     _dataBlockBrush, typeface);
@@ -1015,11 +1374,15 @@ public class TsdRadarControl : Control
         {
             pilot.Callsign,
             $"{pilot.AircraftType,-4} {altStr}",
-            $"{pilot.GroundSpeed}",
-            pilot.Arrival
+            $"{pilot.GroundSpeed}"
         };
 
-        if (pilot.MatchedShowRoute &&
+        if (pilot.ShowOrgDest)
+            linesList.Add($"{pilot.Departure} → {pilot.Arrival}");
+        else
+            linesList.Add(pilot.Arrival);
+
+        if ((pilot.MatchedShowRoute || pilot.ManualShowRoute) &&
             !string.IsNullOrWhiteSpace(pilot.Route))
         {
             const int wrapWidth = 30;
@@ -1057,62 +1420,22 @@ public class TsdRadarControl : Control
         }
     }
 
-    private void DrawTraconBoundary(DrawingContext context,
-        MapItem item, double width, double height)
-    {
-        foreach (var ring in item.Rings)
-        {
-            if (ring.Count < 2) continue;
-
-            var geometry = new StreamGeometry();
-            using (var ctx = geometry.Open())
-            {
-                var first = LatLonToScreen(
-                    ring[0].Lat, ring[0].Lon, width, height);
-                ctx.BeginFigure(first, false);
-
-                for (int i = 1; i < ring.Count; i++)
-                {
-                    var pt = LatLonToScreen(
-                        ring[i].Lat, ring[i].Lon, width, height);
-                    ctx.LineTo(pt);
-                }
-                ctx.EndFigure(true);
-            }
-
-            context.DrawGeometry(null, _traconPen, geometry);
-        }
-
-        var allPoints = item.Rings.SelectMany(r => r).ToList();
-        if (allPoints.Count > 0)
-        {
-            double avgLat = allPoints.Average(p => p.Lat);
-            double avgLon = allPoints.Average(p => p.Lon);
-            var center = LatLonToScreen(avgLat, avgLon, width, height);
-
-            var label = new FormattedText(
-                item.Identifier,
-                System.Globalization.CultureInfo.CurrentCulture,
-                FlowDirection.LeftToRight,
-                _mapLabelTypeface, 9, _traconBrush);
-
-            context.DrawText(label, new Point(
-                center.X - label.Width / 2,
-                center.Y - label.Height / 2));
-        }
-    }
+    // =========================================================================
+    // Draw — Flight routes
+    // =========================================================================
 
     private void DrawRoutes(DrawingContext context,
         double width, double height)
     {
         foreach (var pilot in VisiblePilots)
         {
-            if (!pilot.MatchedDrawRoute) continue;
+            if (!pilot.MatchedDrawRoute && !pilot.ManualDrawRoute) continue;
+            if (pilot.IsHidden) continue;
             if (pilot.ParsedRoute is null ||
                 pilot.ParsedRoute.Count < 2) continue;
 
             var brush = new SolidColorBrush(
-                Color.Parse(pilot.MatchedFilterColor));
+                Color.Parse(pilot.ColorOverride ?? pilot.MatchedFilterColor));
             var pen = new Pen(brush, 1.0);
 
             int nextWaypointIndex = FindNextWaypoint(
@@ -1140,6 +1463,33 @@ public class TsdRadarControl : Control
             context.DrawGeometry(null, pen, geo);
         }
     }
+
+    private static int FindNextWaypoint(
+        double pilotLat, double pilotLon,
+        List<LatLon> route)
+    {
+        double minDist = double.MaxValue;
+        int closestIndex = 0;
+
+        for (int i = 0; i < route.Count; i++)
+        {
+            double dLat = route[i].Lat - pilotLat;
+            double dLon = route[i].Lon - pilotLon;
+            double dist = dLat * dLat + dLon * dLon;
+
+            if (dist < minDist)
+            {
+                minDist = dist;
+                closestIndex = i;
+            }
+        }
+
+        return Math.Min(closestIndex + 1, route.Count - 1);
+    }
+
+    // =========================================================================
+    // Draw — Range rings
+    // =========================================================================
 
     private void DrawRangeRings(DrawingContext context,
         double width, double height)
@@ -1186,6 +1536,7 @@ public class TsdRadarControl : Control
 
                 context.DrawGeometry(null, pen, geo);
 
+                // Distance label at top of ring
                 double labelLat = config.CenterLat + radiusDegLat;
                 var labelPt = LatLonToScreen(
                     labelLat, config.CenterLon, width, height);
@@ -1201,6 +1552,7 @@ public class TsdRadarControl : Control
                     labelPt.Y - ringLabel.Height - 2));
             }
 
+            // Center dot and identifier
             var centerPt = LatLonToScreen(
                 config.CenterLat, config.CenterLon, width, height);
 
@@ -1218,28 +1570,9 @@ public class TsdRadarControl : Control
         }
     }
 
-    private static int FindNextWaypoint(
-        double pilotLat, double pilotLon,
-        List<LatLon> route)
-    {
-        double minDist = double.MaxValue;
-        int closestIndex = 0;
-
-        for (int i = 0; i < route.Count; i++)
-        {
-            double dLat = route[i].Lat - pilotLat;
-            double dLon = route[i].Lon - pilotLon;
-            double dist = dLat * dLat + dLon * dLon;
-
-            if (dist < minDist)
-            {
-                minDist = dist;
-                closestIndex = i;
-            }
-        }
-
-        return Math.Min(closestIndex + 1, route.Count - 1);
-    }
+    // =========================================================================
+    // Draw — Active map items (airports, VORs, NDBs, fixes, TRACONs, etc.)
+    // =========================================================================
 
     private void DrawActiveMapItems(DrawingContext context,
                                      double width, double height)
@@ -1260,49 +1593,58 @@ public class TsdRadarControl : Control
                         new Rect(pt.X - half, pt.Y - half,
                             half * 2, half * 2));
 
-                    var airportLabel = new FormattedText(
-                        item.Identifier.Length > 3
-                            ? item.Identifier[..3]
-                            : item.Identifier,
-                        System.Globalization.CultureInfo.CurrentCulture,
-                        FlowDirection.LeftToRight,
-                        _mapLabelTypeface, 9, _airportBrush);
+                    if (item.ShowLabel)
+                    {
+                        var airportLabel = new FormattedText(
+                            item.Identifier.Length > 3
+                                ? item.Identifier[..3]
+                                : item.Identifier,
+                            System.Globalization.CultureInfo.CurrentCulture,
+                            FlowDirection.LeftToRight,
+                            _mapLabelTypeface, 9, _airportBrush);
 
-                    context.DrawText(airportLabel,
-                        new Point(pt.X + half + 2,
-                            pt.Y - airportLabel.Height / 2));
+                        context.DrawText(airportLabel,
+                            new Point(pt.X + half + 2,
+                                pt.Y - airportLabel.Height / 2));
+                    }
                     break;
 
                 case string t when t.Contains("VOR"):
                     context.DrawEllipse(null, _vorPen, pt, 2.5, 4.0);
 
-                    var vorLabel = new FormattedText(
-                        item.Identifier.Length > 3
-                            ? item.Identifier[..3]
-                            : item.Identifier,
-                        System.Globalization.CultureInfo.CurrentCulture,
-                        FlowDirection.LeftToRight,
-                        _mapLabelTypeface, 9, _vorBrush);
+                    if (item.ShowLabel)
+                    {
+                        var vorLabel = new FormattedText(
+                            item.Identifier.Length > 3
+                                ? item.Identifier[..3]
+                                : item.Identifier,
+                            System.Globalization.CultureInfo.CurrentCulture,
+                            FlowDirection.LeftToRight,
+                            _mapLabelTypeface, 9, _vorBrush);
 
-                    context.DrawText(vorLabel,
-                        new Point(pt.X + 6,
-                            pt.Y - vorLabel.Height / 2));
+                        context.DrawText(vorLabel,
+                            new Point(pt.X + 6,
+                                pt.Y - vorLabel.Height / 2));
+                    }
                     break;
 
                 case string t when t.Contains("NDB"):
                     context.DrawEllipse(null, _ndbPen, pt, 2.5, 4.0);
 
-                    var ndbLabel = new FormattedText(
-                        item.Identifier.Length > 3
-                            ? item.Identifier[..3]
-                            : item.Identifier,
-                        System.Globalization.CultureInfo.CurrentCulture,
-                        FlowDirection.LeftToRight,
-                        _mapLabelTypeface, 9, _ndbBrush);
+                    if (item.ShowLabel)
+                    {
+                        var ndbLabel = new FormattedText(
+                            item.Identifier.Length > 3
+                                ? item.Identifier[..3]
+                                : item.Identifier,
+                            System.Globalization.CultureInfo.CurrentCulture,
+                            FlowDirection.LeftToRight,
+                            _mapLabelTypeface, 9, _ndbBrush);
 
-                    context.DrawText(ndbLabel,
-                        new Point(pt.X + 6,
-                            pt.Y - ndbLabel.Height / 2));
+                        context.DrawText(ndbLabel,
+                            new Point(pt.X + 6,
+                                pt.Y - ndbLabel.Height / 2));
+                    }
                     break;
 
                 case "Fix":
@@ -1322,17 +1664,20 @@ public class TsdRadarControl : Control
                     }
                     context.DrawGeometry(null, _fixPen, geo);
 
-                    var fixLabel = new FormattedText(
-                        item.Identifier.Length > 5
-                            ? item.Identifier[..5]
-                            : item.Identifier,
-                        System.Globalization.CultureInfo.CurrentCulture,
-                        FlowDirection.LeftToRight,
-                        _mapLabelTypeface, 9, _fixBrush);
+                    if (item.ShowLabel)
+                    {
+                        var fixLabel = new FormattedText(
+                            item.Identifier.Length > 5
+                                ? item.Identifier[..5]
+                                : item.Identifier,
+                            System.Globalization.CultureInfo.CurrentCulture,
+                            FlowDirection.LeftToRight,
+                            _mapLabelTypeface, 9, _fixBrush);
 
-                    context.DrawText(fixLabel,
-                        new Point(pt.X + triSize + 2,
-                            pt.Y - fixLabel.Height / 2));
+                        context.DrawText(fixLabel,
+                            new Point(pt.X + triSize + 2,
+                                pt.Y - fixLabel.Height / 2));
+                    }
                     break;
 
                 case "TRACON":
@@ -1340,6 +1685,7 @@ public class TsdRadarControl : Control
                     break;
 
                 case "Sector":
+                    // Draw sector boundary rings
                     foreach (var ring in item.Rings)
                     {
                         if (ring.Count < 2) continue;
@@ -1360,43 +1706,51 @@ public class TsdRadarControl : Control
                         context.DrawGeometry(null, _sectorPen, sectorGeo);
                     }
 
-                    foreach (var labelRing in item.Rings)
+                    // Sector labels (identifier + altitude)
+                    if (item.ShowLabel)
                     {
-                        if (labelRing.Count == 0) continue;
+                        foreach (var labelRing in item.Rings)
+                        {
+                            if (labelRing.Count == 0) continue;
 
-                        double sLat = labelRing.Average(p => p.Lat);
-                        double sLon = labelRing.Average(p => p.Lon);
-                        var center = LatLonToScreen(sLat, sLon, width, height);
+                            double sLat = labelRing.Average(p => p.Lat);
+                            double sLon = labelRing.Average(p => p.Lon);
+                            var center = LatLonToScreen(
+                                sLat, sLon, width, height);
 
-                        if (!IsOnScreen(center, width, height)) continue;
+                            if (!IsOnScreen(center, width, height)) continue;
 
-                        var idLabel = new FormattedText(
-                            item.Identifier,
-                            System.Globalization.CultureInfo.CurrentCulture,
-                            FlowDirection.LeftToRight,
-                            _mapLabelTypeface, 9, _mapLabelBrush);
+                            var idLabel = new FormattedText(
+                                item.Identifier,
+                                System.Globalization.CultureInfo.CurrentCulture,
+                                FlowDirection.LeftToRight,
+                                _mapLabelTypeface, 9, _mapLabelBrush);
 
-                        var altLabel = new FormattedText(
-                            item.Label,
-                            System.Globalization.CultureInfo.CurrentCulture,
-                            FlowDirection.LeftToRight,
-                            _mapLabelTypeface, 9, _mapLabelBrush);
+                            var altLabel = new FormattedText(
+                                item.Label,
+                                System.Globalization.CultureInfo.CurrentCulture,
+                                FlowDirection.LeftToRight,
+                                _mapLabelTypeface, 9, _mapLabelBrush);
 
-                        double totalHeight = idLabel.Height + altLabel.Height + 2;
+                            double totalHeight =
+                                idLabel.Height + altLabel.Height + 2;
 
-                        context.DrawText(idLabel, new Point(
-                            center.X - idLabel.Width / 2,
-                            center.Y - totalHeight / 2));
+                            context.DrawText(idLabel, new Point(
+                                center.X - idLabel.Width / 2,
+                                center.Y - totalHeight / 2));
 
-                        context.DrawText(altLabel, new Point(
-                            center.X - altLabel.Width / 2,
-                            center.Y - totalHeight / 2 + idLabel.Height + 2));
+                            context.DrawText(altLabel, new Point(
+                                center.X - altLabel.Width / 2,
+                                center.Y - totalHeight / 2 +
+                                    idLabel.Height + 2));
+                        }
                     }
                     break;
 
                 case "Airway":
                     if (item.Rings.Count > 0)
                     {
+                        // Draw airway line
                         var airwayGeo = new StreamGeometry();
                         using (var ctx = airwayGeo.Open())
                         {
@@ -1426,24 +1780,83 @@ public class TsdRadarControl : Control
 
                         context.DrawGeometry(null, airwayPen, airwayGeo);
 
-                        var midPt = item.Rings[0][item.Rings[0].Count / 2];
-                        var midScreen = LatLonToScreen(
-                            midPt.Lat, midPt.Lon, width, height);
-
-                        if (IsOnScreen(midScreen, width, height))
+                        // Airway identifier label at midpoint
+                        if (item.ShowLabel)
                         {
-                            var airwayLabel = new FormattedText(
-                                item.Identifier,
-                                System.Globalization.CultureInfo.CurrentCulture,
-                                FlowDirection.LeftToRight,
-                                _mapLabelTypeface, 9, _mapLabelBrush);
+                            var midPt =
+                                item.Rings[0][item.Rings[0].Count / 2];
+                            var midScreen = LatLonToScreen(
+                                midPt.Lat, midPt.Lon, width, height);
 
-                            context.DrawText(airwayLabel, new Point(
-                                midScreen.X - airwayLabel.Width / 2,
-                                midScreen.Y - airwayLabel.Height / 2));
+                            if (IsOnScreen(midScreen, width, height))
+                            {
+                                var airwayLabel = new FormattedText(
+                                    item.Identifier,
+                                    System.Globalization.CultureInfo
+                                        .CurrentCulture,
+                                    FlowDirection.LeftToRight,
+                                    _mapLabelTypeface, 9, _mapLabelBrush);
+
+                                context.DrawText(airwayLabel, new Point(
+                                    midScreen.X - airwayLabel.Width / 2,
+                                    midScreen.Y - airwayLabel.Height / 2));
+                            }
                         }
                     }
                     break;
+            }
+        }
+    }
+
+    // =========================================================================
+    // Draw — TRACON boundary (special case with multi-ring + centered label)
+    // =========================================================================
+
+    private void DrawTraconBoundary(DrawingContext context,
+        MapItem item, double width, double height)
+    {
+        foreach (var ring in item.Rings)
+        {
+            if (ring.Count < 2) continue;
+
+            var geometry = new StreamGeometry();
+            using (var ctx = geometry.Open())
+            {
+                var first = LatLonToScreen(
+                    ring[0].Lat, ring[0].Lon, width, height);
+                ctx.BeginFigure(first, false);
+
+                for (int i = 1; i < ring.Count; i++)
+                {
+                    var pt = LatLonToScreen(
+                        ring[i].Lat, ring[i].Lon, width, height);
+                    ctx.LineTo(pt);
+                }
+                ctx.EndFigure(true);
+            }
+
+            context.DrawGeometry(null, _traconPen, geometry);
+        }
+
+        if (item.ShowLabel)
+        {
+            var allPoints = item.Rings.SelectMany(r => r).ToList();
+            if (allPoints.Count > 0)
+            {
+                double avgLat = allPoints.Average(p => p.Lat);
+                double avgLon = allPoints.Average(p => p.Lon);
+                var center = LatLonToScreen(
+                    avgLat, avgLon, width, height);
+
+                var label = new FormattedText(
+                    item.Identifier,
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight,
+                    _mapLabelTypeface, 9, _traconBrush);
+
+                context.DrawText(label, new Point(
+                    center.X - label.Width / 2,
+                    center.Y - label.Height / 2));
             }
         }
     }

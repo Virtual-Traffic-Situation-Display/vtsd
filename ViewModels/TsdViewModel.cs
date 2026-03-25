@@ -520,6 +520,15 @@ public partial class TsdViewModel : ObservableObject, IDisposable
         return null;
     }
 
+    public List<LatLon> ResolveRoute(VatsimPilot pilot)
+    {
+        if (string.IsNullOrWhiteSpace(pilot.Route))
+            return new List<LatLon>();
+
+        return _mapDataService.ResolveRoute(
+            pilot.Departure, pilot.Route, pilot.Arrival);
+    }
+
     public void RemoveMapItem(MapItem item)
     {
         ActiveMapItems.Remove(item);

@@ -10,6 +10,7 @@ public class MapItem
     public double Lon { get; set; }
     public string Color { get; set; } = "#FFFFFF";
     public string Label { get; set; } = string.Empty;
+    public bool ShowLabel { get; set; } = true;
     public List<List<LatLon>> Rings { get; set; } = new();
     public override string ToString() => Identifier;
 }

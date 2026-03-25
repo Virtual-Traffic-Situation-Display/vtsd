@@ -146,6 +146,8 @@
           <MenuItem Header="Altitude Filter..."
                     Command="{Binding OpenAltitudeFilterCommand}"/>
         </MenuItem>
+        <MenuItem Header="Restore Hidden Flights"
+                  Command="{Binding RestoreHiddenFlightsCommand}"/>
       </MenuItem>
 
       <!-- ═══════════════════════════════════════════ -->
