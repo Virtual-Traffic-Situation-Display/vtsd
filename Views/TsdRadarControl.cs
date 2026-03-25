@@ -33,6 +33,9 @@ public class TsdRadarControl : Control
     private double _cachedHeight;
 
     private System.Threading.Timer? _radarRefreshTimer;
+    private double _prevCenterLat;
+    private double _prevCenterLon;
+    private double _prevZoomLevel;
     private Point _currentMousePosition;
     private VatsimPilot? _hoveredPilot;
     private string? _hoveredCallsign;
@@ -202,6 +205,10 @@ public class TsdRadarControl : Control
             ObservableCollection<RangeRingConfig>>(
             nameof(RangeRings),
             new ObservableCollection<RangeRingConfig>());
+
+    public static readonly StyledProperty<bool> ShowAllAircraftProperty =
+        AvaloniaProperty.Register<TsdRadarControl, bool>(
+            nameof(ShowAllAircraft), false);
 
     #endregion
 
@@ -373,6 +380,12 @@ public class TsdRadarControl : Control
     {
         get => GetValue(RangeRingsProperty);
         set => SetValue(RangeRingsProperty, value);
+    }
+
+    public bool ShowAllAircraft
+    {
+        get => GetValue(ShowAllAircraftProperty);
+        set => SetValue(ShowAllAircraftProperty, value);
     }
 
     #endregion
@@ -818,15 +831,18 @@ public class TsdRadarControl : Control
         switch (e.Key)
         {
             case Key.M:
+                // Save undo state
+                _prevCenterLat = CenterLat;
+                _prevCenterLon = CenterLon;
+                _prevZoomLevel = ZoomLevel;
+
                 double scale = Math.Min(width, height) * 0.45 * ZoomLevel;
 
-                // Convert mouse offset to projection units
                 double dxProj = (_currentMousePosition.X - width / 2.0)
                     * (Math.PI / 180.0) * 57.0 / scale;
                 double dyProj = (_currentMousePosition.Y - height / 2.0)
                     * (Math.PI / 180.0) * 57.0 / scale;
 
-                // Center in projection space is always (0,0) relative to itself
                 var (newLat, newLon) = LccInverse(
                     dxProj, -dyProj, CenterLat, CenterLon);
 
@@ -837,19 +853,61 @@ public class TsdRadarControl : Control
                 break;
 
             case Key.Z:
+                _prevCenterLat = CenterLat;
+                _prevCenterLon = CenterLon;
+                _prevZoomLevel = ZoomLevel;
+
                 ZoomLevel = Math.Clamp(ZoomLevel * 1.25, 0.25, 20.0);
                 e.Handled = true;
                 ScheduleRadarRefresh();
                 break;
 
             case Key.U:
+                _prevCenterLat = CenterLat;
+                _prevCenterLon = CenterLon;
+                _prevZoomLevel = ZoomLevel;
+
                 ZoomLevel = Math.Clamp(ZoomLevel / 1.25, 0.25, 20.0);
                 e.Handled = true;
                 ScheduleRadarRefresh();
                 break;
+
+            case Key.X:
+                var tempLat = CenterLat;
+                var tempLon = CenterLon;
+                var tempZoom = ZoomLevel;
+
+                CenterLat = _prevCenterLat;
+                CenterLon = _prevCenterLon;
+                ZoomLevel = _prevZoomLevel;
+
+                _prevCenterLat = tempLat;
+                _prevCenterLon = tempLon;
+                _prevZoomLevel = tempZoom;
+
+                e.Handled = true;
+                ScheduleRadarRefresh();
+                break;
+
+            case Key.W:
+                ShowWeather = !ShowWeather;
+                if (ShowWeather)
+                    ScheduleRadarRefresh();
+                e.Handled = true;
+                break;
+
+            case Key.F:
+                ShowAllAircraft = !ShowAllAircraft;
+                e.Handled = true;
+                break;
+
+            case Key.D:
+                _geometriesDirty = true;
+                InvalidateVisual();
+                e.Handled = true;
+                break;
         }
     }
-
     private void DrawAircraft(DrawingContext context,
                                double width, double height)
     {
