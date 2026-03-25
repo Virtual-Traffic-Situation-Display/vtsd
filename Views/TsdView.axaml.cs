@@ -31,6 +31,10 @@ public partial class TsdView : UserControl
             _radarControl.RadarRefreshRequested += OnRadarRefreshRequested;
             _radarControl.RouteResolveRequested -= OnRouteResolveRequested;
             _radarControl.RouteResolveRequested += OnRouteResolveRequested;
+            _radarControl.MapItemRemoveRequested -= OnMapItemRemoveRequested;
+            _radarControl.MapItemRemoveRequested += OnMapItemRemoveRequested;
+            _radarControl.GenericMenuCommandRequested -= OnGenericMenuCommand;
+            _radarControl.GenericMenuCommandRequested += OnGenericMenuCommand;
             System.Diagnostics.Debug.WriteLine(
                 "TsdView: subscribed to RadarRefreshRequested");
         }
@@ -48,6 +52,31 @@ public partial class TsdView : UserControl
         {
             pilot.ParsedRoute = vm.ResolveRoute(pilot);
             _radarControl?.InvalidateVisual();
+        }
+    }
+    private void OnMapItemRemoveRequested(object? sender, MapItem item)
+    {
+        if (DataContext is TsdViewModel vm)
+            vm.RemoveMapItem(item);
+    }
+
+    private void OnGenericMenuCommand(object? sender, string command)
+    {
+        // Walk up to MainWindow to find MainViewModel
+        var mainWindow = this.FindAncestorOfType<Window>();
+        if (mainWindow?.DataContext is not MainViewModel mainVm) return;
+
+        switch (command)
+        {
+            case "SelectFlights":
+                mainVm.OpenSelectFlightsCommand.Execute(null);
+                break;
+            case "ShowMapItem":
+                mainVm.OpenShowMapItemCommand.Execute(null);
+                break;
+            case "RangeRings":
+                mainVm.OpenRangeRingsCommand.Execute(null);
+                break;
         }
     }
 }
