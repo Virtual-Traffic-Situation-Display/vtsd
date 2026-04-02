@@ -341,6 +341,15 @@ public partial class TsdRadarControl
                 e.Handled = true;
                 break;
 
+            case Key.D2:
+                if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+                {
+                    GenericMenuCommandRequested?.Invoke(
+                        this, "FindFlight");
+                    e.Handled = true;
+                }
+                break;
+
             case Key.F:
                 ShowAllAircraft = !ShowAllAircraft;
                 e.Handled = true;

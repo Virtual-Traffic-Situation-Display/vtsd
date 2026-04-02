@@ -190,6 +190,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
+    private void OpenFindFlight() =>
+        _panelManager.OpenWithArgs(
+            new FindFlightPanelWindow(TsdViewModel));
+
+    [RelayCommand]
     private async Task CheckForUpdates()
     {
         var updateInfo = await _updateService.CheckForUpdatesAsync();

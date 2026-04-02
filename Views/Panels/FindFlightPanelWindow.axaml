@@ -1,0 +1,87 @@
+<panels:BasePanelWindow
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:panels="using:vTFMS.Views.Panels"
+    xmlns:vm="using:vTFMS.ViewModels.Panels"
+    x:Class="vTFMS.Views.Panels.FindFlightPanelWindow"
+    x:DataType="vm:FindFlightPanelViewModel"
+    Width="340" Height="420">
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Margin="8">
+
+    <!-- Search row -->
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,4">
+      <TextBox Grid.Column="0"
+               Text="{Binding SearchPattern}"
+               Watermark="Callsign pattern (e.g. UAL*, DAL12?)"
+               FontFamily="Arial" FontSize="11"
+               Margin="0,0,4,0"/>
+      <Button Grid.Column="1"
+              Content="Find"
+              Command="{Binding FindCommand}"
+              FontFamily="Arial" FontSize="11"
+              Padding="12,4"/>
+    </Grid>
+
+    <!-- Highlight color row -->
+    <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*" Margin="0,4">
+      <TextBlock Grid.Column="0"
+                 Text="Highlight:"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center"
+                 Margin="0,0,6,0"/>
+      <Button Grid.Column="1"
+              x:Name="ColorButton"
+              Width="40" Height="20"
+              Padding="0"
+              Click="ColorButton_Click"
+              ToolTip.Tip="Change highlight color"/>
+    </Grid>
+
+    <!-- Results list -->
+    <ListBox Grid.Row="2"
+             ItemsSource="{Binding FoundCallsigns}"
+             SelectedItem="{Binding SelectedCallsign}"
+             FontFamily="Courier New" FontSize="11"
+             Margin="0,4"/>
+
+    <!-- Found count + remove buttons -->
+    <Grid Grid.Row="3" ColumnDefinitions="*,Auto,Auto" Margin="0,4">
+      <TextBlock Grid.Column="0"
+                 Text="{Binding FoundCountText}"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center"/>
+      <Button Grid.Column="1"
+              Content="Remove"
+              Command="{Binding RemoveSelectedCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4,0"/>
+      <Button Grid.Column="2"
+              Content="Clear All"
+              Command="{Binding ClearAllCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4,0"/>
+    </Grid>
+
+    <!-- OK / Apply / Cancel -->
+    <StackPanel Grid.Row="4"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Margin="0,4">
+      <Button Content="OK"
+              Command="{Binding OkCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4"/>
+      <Button Content="Apply"
+              Command="{Binding ApplyCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4"/>
+      <Button Content="Cancel"
+              Command="{Binding CancelCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4"/>
+    </StackPanel>
+
+  </Grid>
+
+</panels:BasePanelWindow>

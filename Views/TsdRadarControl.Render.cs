@@ -95,13 +95,16 @@ public partial class TsdRadarControl
                 pilot.Lat, pilot.Lon, width, height);
             if (!IsOnScreen(pt, width, height)) continue;
 
-            var color = pilot.ColorOverride ?? pilot.MatchedFilterColor;
+            var color = pilot.FoundColor
+                ?? pilot.ColorOverride
+                ?? pilot.MatchedFilterColor;
             var brush = new SolidColorBrush(Color.Parse(color));
 
             DrawAircraftSymbol(context, pt, pilot.Heading, size, brush);
 
-            // Show data block if persistent, or on hover
+            // Show data block if persistent, found, or on hover
             if (pilot.ShowDataBlock ||
+                pilot.IsFound ||
                 (_hoveredCallsign != null &&
                  _hoveredCallsign == pilot.Callsign))
             {

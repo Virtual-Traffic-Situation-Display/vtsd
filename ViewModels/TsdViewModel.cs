@@ -19,6 +19,11 @@ public partial class TsdViewModel : ObservableObject, IDisposable
     private readonly Dictionary<string, MapItem> _navDataCache = new();
     private List<TraconBoundary> _allTracons = new();
 
+    // Find Flight state
+    private readonly HashSet<string> _foundCallsigns =
+        new(StringComparer.OrdinalIgnoreCase);
+    private string _findFlightHighlightColor = "#FFFF00";
+
     public double LastScreenWidth => _lastScreenWidth;
     public double LastScreenHeight => _lastScreenHeight;
 
@@ -534,6 +539,41 @@ public partial class TsdViewModel : ObservableObject, IDisposable
         ActiveMapItems.Remove(item);
     }
 
+    // =========================================================================
+    // Find Flight
+    // =========================================================================
+
+    public void UpdateFoundFlights(HashSet<string> callsigns, string color)
+    {
+        _foundCallsigns.Clear();
+        foreach (var cs in callsigns)
+            _foundCallsigns.Add(cs);
+        _findFlightHighlightColor = color;
+
+        foreach (var pilot in _vatsimService.CurrentPilots)
+        {
+            pilot.IsFound = _foundCallsigns.Contains(pilot.Callsign);
+            pilot.FoundColor = pilot.IsFound ? _findFlightHighlightColor : null;
+        }
+
+        RefreshVisiblePilots(_vatsimService.CurrentPilots);
+    }
+
+    public void ClearFoundFlights()
+    {
+        _foundCallsigns.Clear();
+        foreach (var pilot in _vatsimService.CurrentPilots)
+        {
+            pilot.IsFound = false;
+            pilot.FoundColor = null;
+        }
+        RefreshVisiblePilots(_vatsimService.CurrentPilots);
+    }
+
+    // =========================================================================
+    // Flight filters
+    // =========================================================================
+
     public void SetFlightFilters(List<FlightFilter> filters)
     {
         _flightFilters = filters;
@@ -557,7 +597,8 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                      !string.IsNullOrWhiteSpace(f.Departure)))
                 .ToList();
 
-            if (!ShowAllAircraft && !activeFilters.Any())
+            if (!ShowAllAircraft && !activeFilters.Any() &&
+                _foundCallsigns.Count == 0)
             {
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                     VisiblePilots.Clear());
@@ -569,6 +610,11 @@ public partial class TsdViewModel : ObservableObject, IDisposable
             foreach (var pilot in pilots)
             {
                 if (!IsInMapView(pilot.Lat, pilot.Lon)) continue;
+
+                // Update found state for this pilot
+                pilot.IsFound = _foundCallsigns.Contains(pilot.Callsign);
+                pilot.FoundColor = pilot.IsFound
+                    ? _findFlightHighlightColor : null;
 
                 // Altitude filter
                 if (AltitudeFilterEnabled &&
@@ -622,6 +668,22 @@ public partial class TsdViewModel : ObservableObject, IDisposable
                     pilot.MatchedFilterColor = "#FFFFFF";
                     pilot.MatchedDrawRoute = false;
                     pilot.MatchedShowRoute = false;
+                    matched.Add(pilot);
+                }
+            }
+
+            // Add found flights that aren't already in the matched list
+            var matchedCallsigns = new HashSet<string>(
+                matched.Select(p => p.Callsign),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var pilot in pilots)
+            {
+                if (_foundCallsigns.Contains(pilot.Callsign) &&
+                    !matchedCallsigns.Contains(pilot.Callsign))
+                {
+                    pilot.IsFound = true;
+                    pilot.FoundColor = _findFlightHighlightColor;
                     matched.Add(pilot);
                 }
             }
