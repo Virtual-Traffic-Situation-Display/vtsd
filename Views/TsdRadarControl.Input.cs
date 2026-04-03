@@ -126,19 +126,31 @@ public partial class TsdRadarControl
         };
         menu.Items.Add(orgDestItem);
 
+        bool routeVisible = pilot.ManualDrawRoute ||
+            pilot.MatchedDrawRoute ||
+            (FlightDisplaySettings.DrawRoutes && !pilot.ForceHideRoute);
         var drawRouteItem = new MenuItem
         {
-            Header = (pilot.ManualDrawRoute || pilot.MatchedDrawRoute)
-                ? "Hide Route" : "Draw Route"
+            Header = routeVisible ? "Hide Route" : "Draw Route"
         };
         drawRouteItem.Click += (_, _) =>
         {
-            pilot.ManualDrawRoute = !pilot.ManualDrawRoute;
-            if (pilot.ManualDrawRoute &&
-                pilot.ParsedRoute.Count == 0 &&
-                !string.IsNullOrWhiteSpace(pilot.Route))
+            if (routeVisible)
             {
-                RouteResolveRequested?.Invoke(this, pilot);
+                // Hide: clear manual, set force-hide to override global
+                pilot.ManualDrawRoute = false;
+                pilot.ForceHideRoute = true;
+            }
+            else
+            {
+                // Show: enable manual, clear force-hide
+                pilot.ForceHideRoute = false;
+                pilot.ManualDrawRoute = true;
+                if (pilot.ParsedRoute.Count == 0 &&
+                    !string.IsNullOrWhiteSpace(pilot.Route))
+                {
+                    RouteResolveRequested?.Invoke(this, pilot);
+                }
             }
             InvalidateVisual();
         };
@@ -339,15 +351,6 @@ public partial class TsdRadarControl
                 _geometriesDirty = true;
                 InvalidateVisual();
                 e.Handled = true;
-                break;
-
-            case Key.D2:
-                if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-                {
-                    GenericMenuCommandRequested?.Invoke(
-                        this, "FindFlight");
-                    e.Handled = true;
-                }
                 break;
 
             case Key.F:

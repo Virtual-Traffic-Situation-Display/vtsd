@@ -155,6 +155,11 @@ public partial class TsdRadarControl
         AvaloniaProperty.Register<TsdRadarControl, bool>(
             nameof(ShowAllAircraft), false);
 
+    public static readonly StyledProperty<FlightDisplaySettings>
+        FlightDisplaySettingsProperty =
+        AvaloniaProperty.Register<TsdRadarControl, FlightDisplaySettings>(
+            nameof(FlightDisplaySettings), new FlightDisplaySettings());
+
     #endregion
 
     // =========================================================================
@@ -337,6 +342,12 @@ public partial class TsdRadarControl
         set => SetValue(ShowAllAircraftProperty, value);
     }
 
+    public FlightDisplaySettings FlightDisplaySettings
+    {
+        get => GetValue(FlightDisplaySettingsProperty);
+        set => SetValue(FlightDisplaySettingsProperty, value);
+    }
+
     #endregion
 
     // =========================================================================
@@ -369,6 +380,7 @@ public partial class TsdRadarControl
             ShowWeatherProperty,
             DisplaySettingsProperty,
             RadarOpacityProperty,
-            RangeRingsProperty);
+            RangeRingsProperty,
+            FlightDisplaySettingsProperty);
     }
 }

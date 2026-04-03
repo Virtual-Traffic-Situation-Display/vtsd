@@ -143,6 +143,8 @@
                   IsEnabled="False"/>
         
         <MenuItem Header="Customize">
+          <MenuItem Header="Flight Display..."
+                    Command="{Binding OpenCustomizeFlightDisplayCommand}"/>
           <MenuItem Header="Altitude Filter..."
                     Command="{Binding OpenAltitudeFilterCommand}"/>
         </MenuItem>

@@ -188,6 +188,25 @@ public partial class TsdViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(DisplaySettings));
     }
 
+    public FlightDisplaySettings FlightDisplaySettings { get; set; } = new();
+
+    public void ApplyFlightDisplaySettings()
+    {
+        if (FlightDisplaySettings.DrawRoutes)
+        {
+            foreach (var pilot in VisiblePilots)
+            {
+                if (pilot.ParsedRoute.Count == 0 &&
+                    !string.IsNullOrWhiteSpace(pilot.Route))
+                {
+                    pilot.ParsedRoute = _mapDataService.ResolveRoute(
+                        pilot.Departure, pilot.Route, pilot.Arrival);
+                }
+            }
+        }
+        OnPropertyChanged(nameof(FlightDisplaySettings));
+    }
+
     public async Task RefreshRadarAsync(
         double minLat, double minLon,
         double maxLat, double maxLon,
@@ -589,112 +608,118 @@ public partial class TsdViewModel : ObservableObject, IDisposable
 
     private void RefreshVisiblePilots(List<VatsimPilot> pilots)
     {
-        Task.Run(() =>
+        if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
         {
-            var activeFilters = _flightFilters
-                .Where(f => f.Show &&
-                    (!string.IsNullOrWhiteSpace(f.Arrival) ||
-                     !string.IsNullOrWhiteSpace(f.Departure)))
-                .ToList();
-
-            if (!ShowAllAircraft && !activeFilters.Any() &&
-                _foundCallsigns.Count == 0)
-            {
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    VisiblePilots.Clear());
-                return;
-            }
-
-            var matched = new List<VatsimPilot>();
-
-            foreach (var pilot in pilots)
-            {
-                if (!IsInMapView(pilot.Lat, pilot.Lon)) continue;
-
-                // Update found state for this pilot
-                pilot.IsFound = _foundCallsigns.Contains(pilot.Callsign);
-                pilot.FoundColor = pilot.IsFound
-                    ? _findFlightHighlightColor : null;
-
-                // Altitude filter
-                if (AltitudeFilterEnabled &&
-                    (pilot.Altitude < AltitudeFloor ||
-                     pilot.Altitude > AltitudeCeiling))
-                    continue;
-
-                bool matchedFilter = false;
-                foreach (var filter in activeFilters)
-                {
-                    bool arrivalMatch =
-                        string.IsNullOrWhiteSpace(filter.Arrival) ||
-                        filter.Arrival
-                            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                            .Any(a => pilot.Arrival.Contains(
-                                a.ToUpperInvariant(),
-                                StringComparison.OrdinalIgnoreCase));
-
-                    bool departureMatch =
-                        string.IsNullOrWhiteSpace(filter.Departure) ||
-                        filter.Departure
-                            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                            .Any(d => pilot.Departure.Contains(
-                                d.ToUpperInvariant(),
-                                StringComparison.OrdinalIgnoreCase));
-
-                    if (arrivalMatch && departureMatch)
-                    {
-                        matchedFilter = true;
-                        pilot.MatchedFilterColor = filter.Color;
-                        pilot.MatchedDrawRoute = filter.DrawRoute;
-                        pilot.MatchedShowRoute = filter.ShowRoute;
-                        break;
-                    }
-                }
-
-                if (matchedFilter)
-                {
-                    if (pilot.MatchedDrawRoute &&
-                        pilot.ParsedRoute.Count == 0 &&
-                        !string.IsNullOrWhiteSpace(pilot.Route))
-                    {
-                        pilot.ParsedRoute = _mapDataService.ResolveRoute(
-                            pilot.Departure, pilot.Route, pilot.Arrival);
-                    }
-                    matched.Add(pilot);
-                }
-                else if (ShowAllAircraft)
-                {
-                    // Unfiltered aircraft get default appearance
-                    pilot.MatchedFilterColor = "#FFFFFF";
-                    pilot.MatchedDrawRoute = false;
-                    pilot.MatchedShowRoute = false;
-                    matched.Add(pilot);
-                }
-            }
-
-            // Add found flights that aren't already in the matched list
-            var matchedCallsigns = new HashSet<string>(
-                matched.Select(p => p.Callsign),
-                StringComparer.OrdinalIgnoreCase);
-
-            foreach (var pilot in pilots)
-            {
-                if (_foundCallsigns.Contains(pilot.Callsign) &&
-                    !matchedCallsigns.Contains(pilot.Callsign))
-                {
-                    pilot.IsFound = true;
-                    pilot.FoundColor = _findFlightHighlightColor;
-                    matched.Add(pilot);
-                }
-            }
-
+            DoRefreshVisiblePilots(pilots);
+        }
+        else
+        {
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                DoRefreshVisiblePilots(pilots));
+        }
+    }
+
+    private void DoRefreshVisiblePilots(List<VatsimPilot> pilots)
+    {
+        var activeFilters = _flightFilters
+            .Where(f => f.Show &&
+                (!string.IsNullOrWhiteSpace(f.Arrival) ||
+                 !string.IsNullOrWhiteSpace(f.Departure)))
+            .ToList();
+
+        if (!ShowAllAircraft && !activeFilters.Any() &&
+            _foundCallsigns.Count == 0)
+        {
+            VisiblePilots.Clear();
+            return;
+        }
+
+        var matched = new List<VatsimPilot>();
+
+        foreach (var pilot in pilots)
+        {
+            if (!IsInMapView(pilot.Lat, pilot.Lon)) continue;
+
+            // Update found state for this pilot
+            pilot.IsFound = _foundCallsigns.Contains(pilot.Callsign);
+            pilot.FoundColor = pilot.IsFound
+                ? _findFlightHighlightColor : null;
+
+            // Altitude filter
+            if (AltitudeFilterEnabled &&
+                (pilot.Altitude < AltitudeFloor ||
+                 pilot.Altitude > AltitudeCeiling))
+                continue;
+
+            bool matchedFilter = false;
+            foreach (var filter in activeFilters)
             {
-                VisiblePilots.Clear();
-                foreach (var pilot in matched)
-                    VisiblePilots.Add(pilot);
-            });
-        });
+                bool arrivalMatch =
+                    string.IsNullOrWhiteSpace(filter.Arrival) ||
+                    filter.Arrival
+                        .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                        .Any(a => pilot.Arrival.Contains(
+                            a.ToUpperInvariant(),
+                            StringComparison.OrdinalIgnoreCase));
+
+                bool departureMatch =
+                    string.IsNullOrWhiteSpace(filter.Departure) ||
+                    filter.Departure
+                        .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                        .Any(d => pilot.Departure.Contains(
+                            d.ToUpperInvariant(),
+                            StringComparison.OrdinalIgnoreCase));
+
+                if (arrivalMatch && departureMatch)
+                {
+                    matchedFilter = true;
+                    pilot.MatchedFilterColor = filter.Color;
+                    pilot.MatchedDrawRoute = filter.DrawRoute;
+                    pilot.MatchedShowRoute = filter.ShowRoute;
+                    break;
+                }
+            }
+
+            if (matchedFilter)
+            {
+                if (pilot.MatchedDrawRoute &&
+                    pilot.ParsedRoute.Count == 0 &&
+                    !string.IsNullOrWhiteSpace(pilot.Route))
+                {
+                    pilot.ParsedRoute = _mapDataService.ResolveRoute(
+                        pilot.Departure, pilot.Route, pilot.Arrival);
+                }
+                matched.Add(pilot);
+            }
+            else if (ShowAllAircraft)
+            {
+                // Unfiltered aircraft get default appearance
+                pilot.MatchedFilterColor = "#FFFFFF";
+                pilot.MatchedDrawRoute = false;
+                pilot.MatchedShowRoute = false;
+                matched.Add(pilot);
+            }
+        }
+
+        // Add found flights that aren't already in the matched list
+        var matchedCallsigns = new HashSet<string>(
+            matched.Select(p => p.Callsign),
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var pilot in pilots)
+        {
+            if (_foundCallsigns.Contains(pilot.Callsign) &&
+                !matchedCallsigns.Contains(pilot.Callsign))
+            {
+                pilot.IsFound = true;
+                pilot.FoundColor = _findFlightHighlightColor;
+                matched.Add(pilot);
+            }
+        }
+
+        VisiblePilots.Clear();
+        foreach (var pilot in matched)
+            VisiblePilots.Add(pilot);
     }
 
     private void OnRadarUpdated(object? sender, byte[]? data)

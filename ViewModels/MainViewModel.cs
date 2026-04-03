@@ -195,6 +195,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
             new FindFlightPanelWindow(TsdViewModel));
 
     [RelayCommand]
+    private void OpenCustomizeFlightDisplay() =>
+        _panelManager.OpenWithArgs(
+            new CustomizeFlightDisplayWindow(TsdViewModel));
+
+    [RelayCommand]
     private async Task CheckForUpdates()
     {
         var updateInfo = await _updateService.CheckForUpdatesAsync();
