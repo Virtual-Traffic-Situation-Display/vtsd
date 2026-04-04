@@ -29,5 +29,6 @@
     ArtccBoundaries="{Binding ArtccBoundaries}"
     ShowArtcc="{Binding ShowArtcc, Mode=TwoWay}"
     ShowAllAircraft="{Binding ShowAllAircraft, Mode=TwoWay}"
-    RangeRings="{Binding RangeRings}"/>
+    RangeRings="{Binding RangeRings}"
+    FlightDisplaySettings="{Binding FlightDisplaySettings}"/>
 </UserControl>

@@ -26,7 +26,12 @@ public class VatsimPilot
     public bool ManualShowRoute { get; set; } = false;
     public string? ColorOverride { get; set; }
     public bool IsHidden { get; set; } = false;
+    public bool ForceHideRoute { get; set; } = false;
     public List<LatLon> ParsedRoute { get; set; } = new();
+
+    // Find Flight — set by FindFlightPanelViewModel
+    public bool IsFound { get; set; } = false;
+    public string? FoundColor { get; set; }
 
     // Speed averaging for smoother projections
     private readonly Queue<int> _speedHistory = new();

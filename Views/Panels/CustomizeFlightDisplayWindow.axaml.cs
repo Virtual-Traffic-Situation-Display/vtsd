@@ -4,17 +4,17 @@ using vTFMS.ViewModels.Panels;
 
 namespace vTFMS.Views.Panels;
 
-public partial class OverlaysPanelWindow : BasePanelWindow
+public partial class CustomizeFlightDisplayWindow : BasePanelWindow
 {
-    public OverlaysPanelWindow()
+    public CustomizeFlightDisplayWindow()
     {
         throw new InvalidOperationException(
             "Use the constructor that takes a TsdViewModel.");
     }
 
-    public OverlaysPanelWindow(TsdViewModel tsdViewModel)
+    public CustomizeFlightDisplayWindow(TsdViewModel tsdViewModel)
     {
-        var vm = new OverlaysPanelViewModel(tsdViewModel);
+        var vm = new CustomizeFlightDisplayViewModel(tsdViewModel);
         DataContext = vm;
         InitializeComponent();
 

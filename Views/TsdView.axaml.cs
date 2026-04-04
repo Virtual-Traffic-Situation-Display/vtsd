@@ -77,6 +77,9 @@ public partial class TsdView : UserControl
             case "RangeRings":
                 mainVm.OpenRangeRingsCommand.Execute(null);
                 break;
+            case "FindFlight":
+                mainVm.OpenFindFlightCommand.Execute(null);
+                break;
         }
     }
 }

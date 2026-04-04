@@ -137,12 +137,14 @@
         <MenuItem Header="Show Flight Count"
                   Command="{Binding ToggleFlightCountCommand}"/>
         <MenuItem Header="Find Flight..."
-                  IsEnabled="False"/>
+                  Command="{Binding OpenFindFlightCommand}"/>
         
         <MenuItem Header="View Departures"
                   IsEnabled="False"/>
         
         <MenuItem Header="Customize">
+          <MenuItem Header="Flight Display..."
+                    Command="{Binding OpenCustomizeFlightDisplayCommand}"/>
           <MenuItem Header="Altitude Filter..."
                     Command="{Binding OpenAltitudeFilterCommand}"/>
         </MenuItem>

@@ -138,7 +138,8 @@ public partial class TsdRadarControl : Control
             change.Property == ArtccBoundariesProperty ||
             change.Property == ShowArtccProperty ||
             change.Property == DisplaySettingsProperty ||
-            change.Property == RangeRingsProperty)
+            change.Property == RangeRingsProperty ||
+            change.Property == FlightDisplaySettingsProperty)
         {
             _geometriesDirty = true;
 

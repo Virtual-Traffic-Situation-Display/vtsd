@@ -75,6 +75,7 @@ public partial class TsdRadarControl
         DrawRoutes(context, width, height);
         DrawActiveMapItems(context, width, height);
         DrawAircraft(context, width, height);
+        DrawLeadLines(context, width, height);
     }
 
     // =========================================================================
@@ -95,13 +96,17 @@ public partial class TsdRadarControl
                 pilot.Lat, pilot.Lon, width, height);
             if (!IsOnScreen(pt, width, height)) continue;
 
-            var color = pilot.ColorOverride ?? pilot.MatchedFilterColor;
+            var color = pilot.FoundColor
+                ?? pilot.ColorOverride
+                ?? pilot.MatchedFilterColor;
             var brush = new SolidColorBrush(Color.Parse(color));
 
             DrawAircraftSymbol(context, pt, pilot.Heading, size, brush);
 
-            // Show data block if persistent, or on hover
-            if (pilot.ShowDataBlock ||
+            // Show data block if global setting, persistent, found, or on hover
+            if (FlightDisplaySettings.ShowDataBlocks ||
+                pilot.ShowDataBlock ||
+                pilot.IsFound ||
                 (_hoveredCallsign != null &&
                  _hoveredCallsign == pilot.Callsign))
             {
@@ -168,12 +173,13 @@ public partial class TsdRadarControl
             $"{pilot.GroundSpeed}"
         };
 
-        if (pilot.ShowOrgDest)
+        if (pilot.ShowOrgDest || FlightDisplaySettings.ShowOrgDest)
             linesList.Add($"{pilot.Departure} → {pilot.Arrival}");
         else
             linesList.Add(pilot.Arrival);
 
-        if ((pilot.MatchedShowRoute || pilot.ManualShowRoute) &&
+        if ((pilot.MatchedShowRoute || pilot.ManualShowRoute ||
+             FlightDisplaySettings.ShowRouteText) &&
             !string.IsNullOrWhiteSpace(pilot.Route))
         {
             const int wrapWidth = 30;
@@ -220,7 +226,9 @@ public partial class TsdRadarControl
     {
         foreach (var pilot in VisiblePilots)
         {
-            if (!pilot.MatchedDrawRoute && !pilot.ManualDrawRoute) continue;
+            if (pilot.ForceHideRoute) continue;
+            if (!pilot.MatchedDrawRoute && !pilot.ManualDrawRoute &&
+                !FlightDisplaySettings.DrawRoutes) continue;
             if (pilot.IsHidden) continue;
             if (pilot.ParsedRoute is null ||
                 pilot.ParsedRoute.Count < 2) continue;
@@ -649,6 +657,48 @@ public partial class TsdRadarControl
                     center.X - label.Width / 2,
                     center.Y - label.Height / 2));
             }
+        }
+    }
+
+    // =========================================================================
+    // Draw — Lead lines (heading/speed projection from aircraft nose)
+    // =========================================================================
+
+    private void DrawLeadLines(DrawingContext context,
+        double width, double height)
+    {
+        if (!FlightDisplaySettings.ShowLeadLines) return;
+
+        double leadMinutes = FlightDisplaySettings.LeadLineMinutes;
+        var pen = new Pen(new SolidColorBrush(Color.Parse("#888888")), 0.6)
+        {
+            DashStyle = DashStyle.Dash
+        };
+
+        foreach (var pilot in VisiblePilots)
+        {
+            if (pilot.IsHidden) continue;
+            if (pilot.GroundSpeed < 30) continue; // skip stationary
+
+            var pt = LatLonToScreen(
+                pilot.Lat, pilot.Lon, width, height);
+            if (!IsOnScreen(pt, width, height)) continue;
+
+            // Project position: distance = speed × time
+            double distNm = pilot.GroundSpeed * (leadMinutes / 60.0);
+            double hdgRad = pilot.Heading * Math.PI / 180.0;
+
+            // Convert NM to approximate degrees
+            double dLat = (distNm / 60.0) * Math.Cos(hdgRad);
+            double dLon = (distNm / 60.0) * Math.Sin(hdgRad)
+                / Math.Cos(pilot.Lat * Math.PI / 180.0);
+
+            double projLat = pilot.Lat + dLat;
+            double projLon = pilot.Lon + dLon;
+
+            var projPt = LatLonToScreen(projLat, projLon, width, height);
+
+            context.DrawLine(pen, pt, projPt);
         }
     }
 }

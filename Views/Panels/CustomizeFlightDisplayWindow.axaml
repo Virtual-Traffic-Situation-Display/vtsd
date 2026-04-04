@@ -1,0 +1,108 @@
+<panels:BasePanelWindow
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:panels="using:vTFMS.Views.Panels"
+    xmlns:vm="using:vTFMS.ViewModels.Panels"
+    x:Class="vTFMS.Views.Panels.CustomizeFlightDisplayWindow"
+    x:DataType="vm:CustomizeFlightDisplayViewModel"
+    Width="340" Height="420">
+
+  <StackPanel Margin="8" Spacing="4">
+
+    <!-- ═══ Show Section ═══ -->
+    <TextBlock Text="Show"
+               FontFamily="Arial" FontSize="12" FontWeight="Bold"
+               Margin="0,4,0,2"/>
+    <Border BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,0,0,4"/>
+
+    <CheckBox Content="Data Blocks (all flights)"
+              IsChecked="{Binding ShowDataBlocks}"
+              FontFamily="Arial" FontSize="11" Margin="8,2"/>
+    <CheckBox Content="Origin / Destination"
+              IsChecked="{Binding ShowOrgDest}"
+              FontFamily="Arial" FontSize="11" Margin="8,2"/>
+    <CheckBox Content="Route Text"
+              IsChecked="{Binding ShowRouteText}"
+              FontFamily="Arial" FontSize="11" Margin="8,2"/>
+
+    <!-- ═══ Draw Section ═══ -->
+    <TextBlock Text="Draw"
+               FontFamily="Arial" FontSize="12" FontWeight="Bold"
+               Margin="0,8,0,2"/>
+    <Border BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,0,0,4"/>
+
+    <CheckBox Content="Draw Routes (all flights)"
+              IsChecked="{Binding DrawRoutes}"
+              FontFamily="Arial" FontSize="11" Margin="8,2"/>
+    <CheckBox Content="Last Reported Position"
+              IsChecked="{Binding ShowLastTz}"
+              IsEnabled="False"
+              FontFamily="Arial" FontSize="11" Margin="8,2"/>
+    <CheckBox Content="Lead Lines"
+              IsChecked="{Binding ShowLeadLines}"
+              FontFamily="Arial" FontSize="11" Margin="8,2"/>
+    <Grid ColumnDefinitions="Auto,100,Auto" Margin="28,2,0,2">
+      <TextBlock Grid.Column="0" Text="Lead time:"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center" Margin="0,0,6,0"/>
+      <NumericUpDown Grid.Column="1"
+                     Value="{Binding LeadLineMinutes}"
+                     Minimum="1" Maximum="60" Increment="1"
+                     FormatString="0"
+                     FontFamily="Arial" FontSize="11"
+                     IsEnabled="{Binding ShowLeadLines}"/>
+      <TextBlock Grid.Column="2" Text="min"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center" Margin="6,0,0,0"/>
+    </Grid>
+
+    <!-- ═══ History Section ═══ -->
+    <TextBlock Text="History"
+               FontFamily="Arial" FontSize="12" FontWeight="Bold"
+               Margin="0,8,0,2"/>
+    <Border BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,0,0,4"/>
+
+    <CheckBox Content="Collect History"
+              IsChecked="{Binding CollectHistory}"
+              IsEnabled="False"
+              FontFamily="Arial" FontSize="11" Margin="8,2"/>
+    <Grid ColumnDefinitions="Auto,100,Auto" Margin="28,2,0,2">
+      <TextBlock Grid.Column="0" Text="Interval:"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center" Margin="0,0,6,0"/>
+      <NumericUpDown Grid.Column="1"
+                     Value="{Binding HistoryIntervalMinutes}"
+                     Minimum="1" Maximum="30" Increment="1"
+                     FormatString="0"
+                     FontFamily="Arial" FontSize="11"
+                     IsEnabled="False"/>
+      <TextBlock Grid.Column="2" Text="min"
+                 FontFamily="Arial" FontSize="11"
+                 VerticalAlignment="Center" Margin="6,0,0,0"/>
+    </Grid>
+    <CheckBox Content="Draw History"
+              IsChecked="{Binding DrawHistory}"
+              IsEnabled="False"
+              FontFamily="Arial" FontSize="11" Margin="8,2"/>
+
+    <!-- ═══ Buttons ═══ -->
+    <StackPanel Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Margin="0,12,0,0">
+      <Button Content="OK"
+              Command="{Binding OkCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4"/>
+      <Button Content="Apply"
+              Command="{Binding ApplyCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4"/>
+      <Button Content="Cancel"
+              Command="{Binding CancelCommand}"
+              FontFamily="Arial" FontSize="11"
+              Margin="4"/>
+    </StackPanel>
+
+  </StackPanel>
+
+</panels:BasePanelWindow>
