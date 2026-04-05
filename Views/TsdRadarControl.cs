@@ -103,6 +103,9 @@ public partial class TsdRadarControl : Control
     /// (e.g. "SelectFlights", "ShowMapItem", "RangeRings").</summary>
     public event EventHandler<string>? GenericMenuCommandRequested;
 
+    /// <summary>Raised when a flight icon is left-clicked to open detail view.</summary>
+    public event EventHandler<VatsimPilot>? FlightDetailRequested;
+
     // =========================================================================
     // Constructor
     // =========================================================================

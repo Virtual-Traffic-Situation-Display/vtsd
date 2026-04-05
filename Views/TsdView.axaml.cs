@@ -35,6 +35,8 @@ public partial class TsdView : UserControl
             _radarControl.MapItemRemoveRequested += OnMapItemRemoveRequested;
             _radarControl.GenericMenuCommandRequested -= OnGenericMenuCommand;
             _radarControl.GenericMenuCommandRequested += OnGenericMenuCommand;
+            _radarControl.FlightDetailRequested -= OnFlightDetailRequested;
+            _radarControl.FlightDetailRequested += OnFlightDetailRequested;
             System.Diagnostics.Debug.WriteLine(
                 "TsdView: subscribed to RadarRefreshRequested");
         }
@@ -81,5 +83,13 @@ public partial class TsdView : UserControl
                 mainVm.OpenFindFlightCommand.Execute(null);
                 break;
         }
+    }
+
+    private void OnFlightDetailRequested(object? sender, VatsimPilot pilot)
+    {
+        var mainWindow = this.FindAncestorOfType<Window>();
+        if (mainWindow?.DataContext is not MainViewModel mainVm) return;
+
+        mainVm.OpenFlightDetail(pilot);
     }
 }

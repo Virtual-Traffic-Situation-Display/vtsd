@@ -9,7 +9,7 @@ namespace vTFMS.Views;
 public partial class TsdRadarControl
 {
     // =========================================================================
-    // Input — Pointer (hover, right-click context menus)
+    // Input — Pointer (hover, left-click detail, right-click context menus)
     // =========================================================================
 
     protected override void OnPointerMoved(PointerEventArgs e)
@@ -51,11 +51,34 @@ public partial class TsdRadarControl
         base.OnPointerPressed(e);
 
         var point = e.GetCurrentPoint(this);
-        if (!point.Properties.IsRightButtonPressed) return;
-
         var clickPos = point.Position;
         var width = Bounds.Width;
         var height = Bounds.Height;
+
+        // ── Left-click: open flight detail ─────────────────────
+        if (point.Properties.IsLeftButtonPressed)
+        {
+            foreach (var pilot in VisiblePilots)
+            {
+                if (pilot.IsHidden) continue;
+                var pt = LatLonToScreen(pilot.Lat, pilot.Lon, width, height);
+                double dx = clickPos.X - pt.X;
+                double dy = clickPos.Y - pt.Y;
+
+                if (Math.Sqrt(dx * dx + dy * dy) <= 10.0)
+                {
+                    FlightDetailRequested?.Invoke(this, pilot);
+                    e.Handled = true;
+                    return;
+                }
+            }
+
+            // Left-click on empty space — no action
+            return;
+        }
+
+        // ── Right-click: context menus ─────────────────────────
+        if (!point.Properties.IsRightButtonPressed) return;
 
         // ── Hit-test 1: Flight icons ─────────────────────────
         foreach (var pilot in VisiblePilots)
@@ -195,6 +218,15 @@ public partial class TsdRadarControl
             colorMenu.Items.Add(colorItem);
         }
         menu.Items.Add(colorMenu);
+
+        menu.Items.Add(new Separator());
+
+        var detailItem = new MenuItem { Header = "Flight Detail..." };
+        detailItem.Click += (_, _) =>
+        {
+            FlightDetailRequested?.Invoke(this, pilot);
+        };
+        menu.Items.Add(detailItem);
 
         menu.Items.Add(new Separator());
 

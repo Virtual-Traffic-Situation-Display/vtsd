@@ -111,6 +111,24 @@ public class VatsimService : IVatsimService, IDisposable
                 existing.Departure = pilot.Departure;
                 existing.Arrival = pilot.Arrival;
                 existing.Route = pilot.Route;
+
+                // Merge additional fields
+                existing.Cid = pilot.Cid;
+                existing.PilotName = pilot.PilotName;
+                existing.Transponder = pilot.Transponder;
+                existing.FlightRules = pilot.FlightRules;
+                existing.AircraftFull = pilot.AircraftFull;
+                existing.Alternate = pilot.Alternate;
+                existing.FiledAltitude = pilot.FiledAltitude;
+                existing.DepTime = pilot.DepTime;
+                existing.EnrouteTime = pilot.EnrouteTime;
+                existing.FuelTime = pilot.FuelTime;
+                existing.Remarks = pilot.Remarks;
+                existing.LogonTime = pilot.LogonTime;
+                existing.AssignedTransponder = pilot.AssignedTransponder;
+                existing.CruiseTas = pilot.CruiseTas;
+                existing.Server = pilot.Server;
+
                 existing.RecordSpeed(pilot.GroundSpeed);
                 newCache[pilot.Callsign] = existing;
             }
@@ -181,6 +199,16 @@ public class VatsimService : IVatsimService, IDisposable
                 string departure = string.Empty;
                 string aircraftType = string.Empty;
                 string route = string.Empty;
+                string flightRules = string.Empty;
+                string aircraftFull = string.Empty;
+                string alternate = string.Empty;
+                string filedAltitude = string.Empty;
+                string depTime = string.Empty;
+                string enrouteTime = string.Empty;
+                string fuelTime = string.Empty;
+                string remarks = string.Empty;
+                string assignedTransponder = string.Empty;
+                string cruiseTas = string.Empty;
 
                 if (p.TryGetProperty("flight_plan", out var fp) &&
                     fp.ValueKind == JsonValueKind.Object)
@@ -193,6 +221,27 @@ public class VatsimService : IVatsimService, IDisposable
                         ? ac.GetString() ?? string.Empty : string.Empty;
                     route = fp.TryGetProperty("route", out var rt)
                         ? rt.GetString() ?? string.Empty : string.Empty;
+                    flightRules = fp.TryGetProperty("flight_rules", out var fr)
+                        ? fr.GetString() ?? string.Empty : string.Empty;
+                    aircraftFull = fp.TryGetProperty("aircraft", out var acFull)
+                        ? acFull.GetString() ?? string.Empty : string.Empty;
+                    alternate = fp.TryGetProperty("alternate", out var alt2)
+                        ? alt2.GetString() ?? string.Empty : string.Empty;
+                    filedAltitude = fp.TryGetProperty("altitude", out var fAlt)
+                        ? fAlt.GetString() ?? string.Empty : string.Empty;
+                    depTime = fp.TryGetProperty("deptime", out var dt)
+                        ? dt.GetString() ?? string.Empty : string.Empty;
+                    enrouteTime = fp.TryGetProperty("enroute_time", out var et)
+                        ? et.GetString() ?? string.Empty : string.Empty;
+                    fuelTime = fp.TryGetProperty("fuel_time", out var ft)
+                        ? ft.GetString() ?? string.Empty : string.Empty;
+                    remarks = fp.TryGetProperty("remarks", out var rmk)
+                        ? rmk.GetString() ?? string.Empty : string.Empty;
+                    assignedTransponder = fp.TryGetProperty(
+                        "assigned_transponder", out var atp)
+                        ? atp.GetString() ?? string.Empty : string.Empty;
+                    cruiseTas = fp.TryGetProperty("cruise_tas", out var tas)
+                        ? tas.GetString() ?? string.Empty : string.Empty;
                 }
 
                 if (!ShouldIncludePilot(lat, lon, arrival, departure))
@@ -212,7 +261,29 @@ public class VatsimService : IVatsimService, IDisposable
                     AircraftType = aircraftType,
                     Departure = departure,
                     Arrival = arrival,
-                    Route = route
+                    Route = route,
+
+                    // Additional fields
+                    Cid = p.TryGetProperty("cid", out var cid)
+                        ? cid.GetInt32() : 0,
+                    PilotName = p.TryGetProperty("name", out var name)
+                        ? name.GetString() ?? string.Empty : string.Empty,
+                    Transponder = p.TryGetProperty("transponder", out var xpdr)
+                        ? xpdr.GetString() ?? string.Empty : string.Empty,
+                    Server = p.TryGetProperty("server", out var srv)
+                        ? srv.GetString() ?? string.Empty : string.Empty,
+                    LogonTime = p.TryGetProperty("logon_time", out var lt)
+                        ? lt.GetString() ?? string.Empty : string.Empty,
+                    FlightRules = flightRules,
+                    AircraftFull = aircraftFull,
+                    Alternate = alternate,
+                    FiledAltitude = filedAltitude,
+                    DepTime = depTime,
+                    EnrouteTime = enrouteTime,
+                    FuelTime = fuelTime,
+                    Remarks = remarks,
+                    AssignedTransponder = assignedTransponder,
+                    CruiseTas = cruiseTas
                 };
 
                 result.Add(pilot);

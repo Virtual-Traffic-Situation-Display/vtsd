@@ -18,7 +18,24 @@ public class VatsimPilot
     public string MatchedFilterColor { get; set; } = "#FFFFFF";
     public bool MatchedDrawRoute { get; set; } = false;
     public bool MatchedShowRoute { get; set; } = false;
-    
+
+    // Additional VATSIM API fields
+    public int Cid { get; set; }
+    public string PilotName { get; set; } = string.Empty;
+    public string Transponder { get; set; } = string.Empty;
+    public string FlightRules { get; set; } = string.Empty;
+    public string AircraftFull { get; set; } = string.Empty;
+    public string Alternate { get; set; } = string.Empty;
+    public string FiledAltitude { get; set; } = string.Empty;
+    public string DepTime { get; set; } = string.Empty;
+    public string EnrouteTime { get; set; } = string.Empty;
+    public string FuelTime { get; set; } = string.Empty;
+    public string Remarks { get; set; } = string.Empty;
+    public string LogonTime { get; set; } = string.Empty;
+    public string AssignedTransponder { get; set; } = string.Empty;
+    public string CruiseTas { get; set; } = string.Empty;
+    public string Server { get; set; } = string.Empty;
+
     // Per-pilot overrides (set via right-click context menu)
     public bool ShowDataBlock { get; set; } = false;
     public bool ShowOrgDest { get; set; } = false;

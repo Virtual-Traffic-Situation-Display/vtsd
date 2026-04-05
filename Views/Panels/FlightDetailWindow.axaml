@@ -1,0 +1,214 @@
+<panels:BasePanelWindow
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:panels="using:vTFMS.Views.Panels"
+    xmlns:vm="using:vTFMS.ViewModels.Panels"
+    x:Class="vTFMS.Views.Panels.FlightDetailWindow"
+    x:DataType="vm:FlightDetailPanelViewModel"
+    Width="440" Height="520"
+    MinWidth="360" MinHeight="400"
+    Title="{Binding Title}">
+
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="12,8" Spacing="10">
+
+      <!-- Identity -->
+      <Border Background="#22000000" CornerRadius="4" Padding="10,8">
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto"
+              RowSpacing="4" ColumnSpacing="12">
+
+          <TextBlock Grid.Row="0" Grid.Column="0"
+                     Text="Callsign" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="0" Grid.Column="1"
+                     Text="{Binding Callsign}"
+                     FontWeight="Bold" FontSize="14"/>
+
+          <TextBlock Grid.Row="1" Grid.Column="0"
+                     Text="Pilot" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="1" Grid.Column="1"
+                     Text="{Binding PilotName}" FontSize="11"/>
+
+          <TextBlock Grid.Row="2" Grid.Column="0"
+                     Text="CID" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="2" Grid.Column="1"
+                     Text="{Binding Cid}" FontSize="11"/>
+        </Grid>
+      </Border>
+
+      <!-- Flight Plan -->
+      <TextBlock Text="FLIGHT PLAN" FontWeight="Bold" FontSize="10"
+                 Foreground="#777777" Margin="0,2,0,0"/>
+      <Border Background="#22000000" CornerRadius="4" Padding="10,8">
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+              RowSpacing="4" ColumnSpacing="12">
+
+          <TextBlock Grid.Row="0" Grid.Column="0"
+                     Text="Rules" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="0" Grid.Column="1"
+                     Text="{Binding FlightRules}" FontSize="11"/>
+
+          <TextBlock Grid.Row="1" Grid.Column="0"
+                     Text="Aircraft" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <StackPanel Grid.Row="1" Grid.Column="1" Spacing="1">
+            <TextBlock Text="{Binding AircraftType}" FontSize="11"
+                       FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding AircraftFull}" FontSize="10"
+                       Foreground="#666666" TextWrapping="Wrap"/>
+          </StackPanel>
+
+          <TextBlock Grid.Row="2" Grid.Column="0"
+                     Text="Departure" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="2" Grid.Column="1"
+                     Text="{Binding Departure}" FontSize="11"/>
+
+          <TextBlock Grid.Row="3" Grid.Column="0"
+                     Text="Arrival" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="3" Grid.Column="1"
+                     Text="{Binding Arrival}" FontSize="11"/>
+
+          <TextBlock Grid.Row="4" Grid.Column="0"
+                     Text="Alternate" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="4" Grid.Column="1"
+                     Text="{Binding Alternate}" FontSize="11"/>
+
+          <TextBlock Grid.Row="5" Grid.Column="0"
+                     Text="Filed Alt" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="5" Grid.Column="1"
+                     Text="{Binding FiledAltitude}" FontSize="11"/>
+        </Grid>
+      </Border>
+
+      <!-- Position -->
+      <TextBlock Text="POSITION" FontWeight="Bold" FontSize="10"
+                 Foreground="#777777" Margin="0,2,0,0"/>
+      <Border Background="#22000000" CornerRadius="4" Padding="10,8">
+        <Grid ColumnDefinitions="Auto,*,Auto,*"
+              RowDefinitions="Auto,Auto,Auto"
+              RowSpacing="4" ColumnSpacing="12">
+
+          <TextBlock Grid.Row="0" Grid.Column="0"
+                     Text="Altitude" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="0" Grid.Column="1"
+                     Text="{Binding CurrentAltitude}" FontSize="11"/>
+          <TextBlock Grid.Row="0" Grid.Column="2"
+                     Text="Heading" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="0" Grid.Column="3"
+                     Text="{Binding Heading, StringFormat={}{0}°}" FontSize="11"/>
+
+          <TextBlock Grid.Row="1" Grid.Column="0"
+                     Text="Speed" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="1" Grid.Column="1"
+                     Text="{Binding GroundSpeed, StringFormat={}{0} kts}" FontSize="11"/>
+          <TextBlock Grid.Row="1" Grid.Column="2"
+                     Text="TAS" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="1" Grid.Column="3"
+                     Text="{Binding CruiseTas}" FontSize="11"/>
+
+          <TextBlock Grid.Row="2" Grid.Column="0"
+                     Text="Position" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3"
+                     Text="{Binding Position}" FontSize="11"/>
+        </Grid>
+      </Border>
+
+      <!-- Transponder -->
+      <TextBlock Text="TRANSPONDER" FontWeight="Bold" FontSize="10"
+                 Foreground="#777777" Margin="0,2,0,0"/>
+      <Border Background="#22000000" CornerRadius="4" Padding="10,8">
+        <Grid ColumnDefinitions="Auto,*,Auto,*"
+              RowDefinitions="Auto"
+              RowSpacing="4" ColumnSpacing="12">
+
+          <TextBlock Grid.Row="0" Grid.Column="0"
+                     Text="Squawk" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="0" Grid.Column="1"
+                     Text="{Binding Transponder}" FontSize="11"/>
+          <TextBlock Grid.Row="0" Grid.Column="2"
+                     Text="Assigned" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="0" Grid.Column="3"
+                     Text="{Binding AssignedTransponder}" FontSize="11"/>
+        </Grid>
+      </Border>
+
+      <!-- Times -->
+      <TextBlock Text="TIMES" FontWeight="Bold" FontSize="10"
+                 Foreground="#777777" Margin="0,2,0,0"/>
+      <Border Background="#22000000" CornerRadius="4" Padding="10,8">
+        <Grid ColumnDefinitions="Auto,*,Auto,*"
+              RowDefinitions="Auto,Auto"
+              RowSpacing="4" ColumnSpacing="12">
+
+          <TextBlock Grid.Row="0" Grid.Column="0"
+                     Text="Dep Time" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="0" Grid.Column="1"
+                     Text="{Binding DepTime}" FontSize="11"/>
+          <TextBlock Grid.Row="0" Grid.Column="2"
+                     Text="Enroute" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="0" Grid.Column="3"
+                     Text="{Binding EnrouteTime}" FontSize="11"/>
+
+          <TextBlock Grid.Row="1" Grid.Column="0"
+                     Text="Fuel" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="1" Grid.Column="1"
+                     Text="{Binding FuelTime}" FontSize="11"/>
+          <TextBlock Grid.Row="1" Grid.Column="2"
+                     Text="Logon" FontWeight="SemiBold"
+                     Foreground="#555555" FontSize="11"/>
+          <TextBlock Grid.Row="1" Grid.Column="3"
+                     Text="{Binding LogonTime}" FontSize="11"/>
+        </Grid>
+      </Border>
+
+      <!-- Route -->
+      <TextBlock Text="ROUTE" FontWeight="Bold" FontSize="10"
+                 Foreground="#777777" Margin="0,2,0,0"/>
+      <Border Background="#22000000" CornerRadius="4" Padding="10,8">
+        <TextBlock Text="{Binding Route}" FontSize="11"
+                   TextWrapping="Wrap"/>
+      </Border>
+
+      <!-- Remarks -->
+      <TextBlock Text="REMARKS" FontWeight="Bold" FontSize="10"
+                 Foreground="#777777" Margin="0,2,0,0"/>
+      <Border Background="#22000000" CornerRadius="4" Padding="10,8">
+        <TextBlock Text="{Binding Remarks}" FontSize="11"
+                   TextWrapping="Wrap"/>
+      </Border>
+
+      <!-- Server -->
+      <Border Background="#22000000" CornerRadius="4" Padding="10,4"
+              Margin="0,0,0,4">
+        <TextBlock FontSize="10" Foreground="#888888"
+                   HorizontalAlignment="Right">
+          <TextBlock.Text>
+            <MultiBinding StringFormat="Server: {0}">
+              <Binding Path="Server"/>
+            </MultiBinding>
+          </TextBlock.Text>
+        </TextBlock>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+
+</panels:BasePanelWindow>
