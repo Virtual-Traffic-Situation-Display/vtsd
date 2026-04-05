@@ -32,6 +32,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public TsdViewModel TsdViewModel { get; }
 
     private FlightCountPanelWindow? _flightCountWindow;
+    private FlightDetailWindow? _flightDetailWindow;
 
     [RelayCommand]
     private void ToggleFlightCount()
@@ -198,6 +199,25 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void OpenCustomizeFlightDisplay() =>
         _panelManager.OpenWithArgs(
             new CustomizeFlightDisplayWindow(TsdViewModel));
+
+    /// <summary>
+    /// Opens or updates the flight detail window for the given pilot.
+    /// Called from TsdView when a flight icon is left-clicked.
+    /// </summary>
+    public void OpenFlightDetail(VatsimPilot pilot)
+    {
+        if (_flightDetailWindow != null)
+        {
+            _flightDetailWindow.UpdatePilot(pilot);
+            _flightDetailWindow.Activate();
+            return;
+        }
+
+        _flightDetailWindow = new FlightDetailWindow(pilot);
+        _flightDetailWindow.Closed += (_, _) =>
+            _flightDetailWindow = null;
+        _flightDetailWindow.Show(_mainWindow);
+    }
 
     [RelayCommand]
     private async Task CheckForUpdates()
